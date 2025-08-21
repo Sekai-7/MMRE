@@ -24,6 +24,7 @@ enum class DataType {
 };
 
 // 统一数据包结构
+// 这个ds需要拷贝构造吗？？？
 struct UnifiedDataPacket {
     long long timestamp;
     DataType type;
@@ -35,6 +36,12 @@ struct UnifiedDataPacket {
 
     // 拷贝构造函数 (深拷贝共享内存)
     UnifiedDataPacket(const UnifiedDataPacket& other) : timestamp(other.timestamp), type(other.type), data_size(other.data_size) {
+        if (&other == this) {
+            return;
+        }
+        if (data_ptr != nullptr) {
+            munmap(data_ptr, data_size);
+        }
         if (other.data_ptr && other.data_size > 0) {
             data_ptr = mmap(nullptr, other.data_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
             if (data_ptr == MAP_FAILED) {
@@ -48,22 +55,20 @@ struct UnifiedDataPacket {
 
     // 赋值运算符重载 (深拷贝共享内存)
     UnifiedDataPacket& operator=(const UnifiedDataPacket& other) {
-        if (this != &other) { // self-assignment check
-            if (data_ptr) {
-                munmap(data_ptr, data_size); // 释放旧的共享内存
+        if (&other == this) {
+            return;
+        }
+        if (data_ptr != nullptr) {
+            munmap(data_ptr, data_size);
+        }
+        if (other.data_ptr && other.data_size > 0) {
+            data_ptr = mmap(nullptr, other.data_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+            if (data_ptr == MAP_FAILED) {
+                cerr << "mmap failed in copy constructor";
             }
-            timestamp = other.timestamp;
-            type = other.type;
-            data_size = other.data_size;
-            if (other.data_ptr && other.data_size > 0) {
-                data_ptr = mmap(NULL, other.data_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-                if (data_ptr == MAP_FAILED) {
-                    cerr << "mmap failed in copy constructor";
-                }
-                memcpy(data_ptr, other.data_ptr, other.data_size);
-            } else {
-                data_ptr = nullptr;
-            }
+            memcpy(data_ptr, other.data_ptr, other.data_size);
+        } else {
+            data_ptr = nullptr;
         }
         return *this;
     }
