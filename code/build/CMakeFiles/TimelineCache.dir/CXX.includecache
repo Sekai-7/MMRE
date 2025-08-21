@@ -1,0 +1,38 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/root/Use/TimeLineCache/code/src/benchmark/TimelineCacheBenchmark.cc
+TimelineCacheBenchmark.h
+/root/Use/TimeLineCache/code/src/benchmark/TimelineCacheBenchmark.h
+
+/root/Use/TimeLineCache/code/src/benchmark/TimelineCacheBenchmark.h
+sys/mman.h
+-
+cstring
+-
+iostream
+-
+map
+-
+deque
+-
+vector
+-
+cstdlib
+-
+cstring
+-
+
+/root/Use/TimeLineCache/code/src/benchmark/main.cc
+benchmark/benchmark.h
+-
+vector
+-
+TimelineCacheBenchmark.h
+/root/Use/TimeLineCache/code/src/benchmark/TimelineCacheBenchmark.h
+
