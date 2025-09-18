@@ -41,6 +41,15 @@ public:
 
     void setup_default_triggers();
 
+
+    BatchIngestionResult ingest_batch_data(std::vector<UnifiedDataPacket>&&);
+
+    TriggerManager* get_trigger_manager();
+
+    IngestionStats get_ingestion_stats() const;
+
+    void setup_default_triggers();
+
     // bool ingest_data_with_shared_memory(const UnifiedDataPacket& packet, size_t shared_memory_size);
     // BatchIngestionResult ingest_batch_data(const std::vector<UnifiedDataPacket>& packets);
     // bool ingest_data_zero_copy(UnifiedDataPacket& packet, const SharedMemoryHandle& handle);

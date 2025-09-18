@@ -1,0 +1,67 @@
+// {
+//     "configurations": [
+//         {
+//             "name": "Linux",
+//             "includePath": [
+//                 "${workspaceFolder}/**",
+//                 "${workspaceFolder}/inc",
+//                 "/usr/include/x86_64-linux-gnu/c++/11",
+//                 "/usr/include/c++/11/backward",
+//                 "/usr/lib/gcc/x86_64-linux-gnu/11/include",
+//                 "/usr/local/include",
+//                 "/usr/include/x86_64-linux-gnu",
+//                 "/usr/include"
+//             ],
+//             "browse": {
+//                 "path": [
+//                     "${workspaceFolder}",
+//                     "${workspaceFolder}/inc",
+//                     "/usr/include/x86_64-linux-gnu/c++/11",
+//                     "/usr/include/c++/11/backward",
+//                     "/usr/lib/gcc/x86_64-linux-gnu/11/include",
+//                     "/usr/local/include",
+//                     "/usr/include/x86_64-linux-gnu",
+//                     "/usr/include"
+//                 ],
+//                 "limitSymbolsToIncludedHeaders": false
+//             },
+//             "defines": [],
+//             "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+//             "compilerPath": "/usr/bin/g++",
+//             "cStandard": "gnu17",
+//             "cppStandard": "gnu++17",
+//             "intelliSenseMode": "linux-gcc-x64"
+//         }
+//     ],
+//     "version": 4
+// }
+// {
+//   "configurations": [
+//     {
+//       "name": "Linux",
+//       "configurationProvider": "ms-vscode.cmake-tools",
+//       "compilerPath": "/usr/bin/g++",
+//       "cStandard": "gnu17",
+//       "cppStandard": "gnu++17",
+//       "intelliSenseMode": "linux-gcc-x64"
+//     }
+//   ],
+//   "version": 4
+// }
+
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/g++"
+        }
+    ],
+    "version": 4
+}

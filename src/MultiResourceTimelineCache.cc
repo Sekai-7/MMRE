@@ -9,8 +9,97 @@ bool MultiResourceTimelineCache::insert(const UnifiedDataPacket& data) {
 }
 
 // 查询数据
-QueryResult MultiResourceTimelineCache::query_by_range(ResourceType type, Timestamp start_ts, Timestamp end_ts) const {
+QueryResult MultiResourceTimelineCache::query_by_range(ResourceType type, Timestamp start_ts, Timestamp end_ts) const
+{
+    QueryResult result;
 
+    // 1. 查找资源类型的缓存
+    auto it = resource_caches.find(type);
+    if (it == resource_caches.end()) {
+        return result; // 返回空结果
+    }
+
+    // 2. 加锁保护
+    std::shared_lock<std::shared_mutex> lock(resource_mutexes.at(type));
+
+    // 3. 查询缓存数据
+    TimelineCache *cache = it->second.get();
+    if (cache) {
+        result.resource_data.emplace(type, cache->query_by_range(start_ts, end_ts));
+    }
+
+    return result;
+}
+
+QueryResult MultiResourceTimelineCache::query(ResourceType type, Timestamp ts) const
+{
+    QueryResult result;
+    result.type = type;
+    result.start_ts = start_ts;
+    result.end_ts = end_ts;
+    result.use_shm = false;
+    result.shm_handle_ptr = nullptr;
+    // 获取对应资源类型的缓存
+    TimelineCache* cache = nullptr;
+    {
+        std::shared_lock lock(resource_mutexes_lock);
+        auto it = resource_caches.find(type);
+        if (it != resource_caches.end()) {
+            cache = it->second.get();
+        }
+    }
+    if (!cache) {
+        // 没有缓存，直接返回空结果
+        return result;
+    }
+    // 加读锁，安全访问 TimelineCache
+    std::shared_lock lock(resource_mutexes.at(type));
+    // 查询缓存
+    std::vector<UnifiedDataPacket*> packets = cache->query_range(start_ts, end_ts);
+    for (UnifiedDataPacket* pkt : packets) {
+        if (!pkt) continue;
+        // 更新起止时间
+        if (pkt->timestamp < result.start_ts) result.start_ts = pkt->timestamp;
+        if (pkt->timestamp > result.end_ts) result.end_ts = pkt->timestamp;
+        // 处理数据
+        if (std::holds_alternative<SharedMemoryHandle>(pkt->data_ptr)) {
+            // 使用共享内存
+            result.use_shm = true;
+            // 注意：QueryResult 当前只能保存一个 shm_handle_ptr，如果需要多个，可改为 vector
+            result.shm_handle_ptr = &std::get<SharedMemoryHandle>(pkt->data_ptr);
+        } else if (std::holds_alternative<void*>(pkt->data_ptr)) {
+            // 普通内存，直接拷贝
+            void* ptr = std::get<void*>(pkt->data_ptr);
+            if (ptr && pkt->data_size > 0) {
+                uint8_t* byte_ptr = static_cast<uint8_t*>(ptr);
+                result.data.insert(result.data.end(), byte_ptr, byte_ptr + pkt->data_size);
+            }
+        }
+    }
+    // 检查是否有缓存未覆盖的部分，必要时从持久化加载
+    // if (!is_range_completely_covered_by_cache(type, start_ts, end_ts) && persistence_engine) {
+    //     QueryResult persisted = persistence_engine->query_by_range(type, start_ts, end_ts);
+    //     result = merge_query_results(result, persisted);
+    // }
+    return result;
+    // QueryResult result;
+
+    // // 1. 查找资源类型的缓存
+    // auto it = resource_caches.find(type);
+    // if (it == resource_caches.end()) {
+    //     return result; // 返回空结果
+    // }
+
+    // // 2. 加锁保护
+    // std::shared_lock<std::shared_mutex> lock(resource_mutexes.at(type));
+
+    // // 3. 查询缓存数据
+    // TimelineCache *cache = it->second.get();
+    // if (cache) {
+    //     result.resource_data.emplace(type, cache->query_by_range(start_ts, end_ts));
+    // }
+
+    // return result;
 }
 
 MultiResourceQueryResult MultiResourceTimelineCache::query_all_resources_by_range(Timestamp start_ts, Timestamp end_ts) const {

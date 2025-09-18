@@ -1,5 +1,6 @@
 #include "TimelineCache.h"
 #include "MultiResourceCheckpointManager.h"
+#include "Query.h"
 
 
 #include <vector>
@@ -8,6 +9,7 @@
 #include <shared_mutex>
 #include <optional>
 
+using MultiResourceQueryResult = std::vector<QueryResult>;
 
 class MultiResourceTimelineCache {
 private:

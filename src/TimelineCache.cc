@@ -121,7 +121,7 @@ CacheNode* TimelineCache::rebalance(CacheNode* n) {
 }
 
 // ------------------ 插入 ------------------
-CacheNode* TimelineCache::insert(CacheNode* node, Timestamp ts, const UnifiedDataPacket& packet, CacheNode*& inserted) {
+CacheNode* TimelineCache::insert(CacheNode* node, Timestamp ts, UnifiedDataPacket&& packet, CacheNode*& inserted) {
     // if (!node) {
     //     inserted = new CacheNode(ts, packet);
     //     return inserted;
@@ -132,17 +132,17 @@ CacheNode* TimelineCache::insert(CacheNode* node, Timestamp ts, const UnifiedDat
     }
 
     if (ts < node->timestamp) {
-        CacheNode* child = insert(node->left, ts, packet, inserted);
+        CacheNode* child = insert(node->left, ts, std::move(packet), inserted);
         node->left = child;
         child->parent = node;
     } else if (ts > node->timestamp) {
-        CacheNode* child = insert(node->right, ts, packet, inserted);
+        CacheNode* child = insert(node->right, ts, std::move(packet), inserted);
         node->right = child;
         child->parent = node;
     } else {
         // 覆盖
         current_memory_usage -= (long long)node->packet.data_size;
-        node->packet = packet;
+        node->packet = std::move(packet);
         current_memory_usage += (long long)node->packet.data_size;
         inserted = node;
         return node;
@@ -256,10 +256,10 @@ void TimelineCache::refresh_min_max_after_change() {
     }
 }
 
-void TimelineCache::query_range(CacheNode* node, Timestamp l, Timestamp r, std::vector<UnifiedDataPacket>& out) const {
+void TimelineCache::query_range(CacheNode* node, Timestamp l, Timestamp r, std::vector<UnifiedDataPacket*>& out) const {
     if (!node) return;
     if (node->timestamp > l) query_range(node->left, l, r, out);
-    if (node->timestamp >= l && node->timestamp <= r) out.push_back(node->packet);
+    if (node->timestamp >= l && node->timestamp <= r) out.push_back(&node->packet);
     if (node->timestamp < r) query_range(node->right, l, r, out);
 }
 
@@ -282,11 +282,11 @@ TimelineCache::~TimelineCache() {
     destroy(root);
 }
 
-void TimelineCache::insert(UnifiedDataPacket packet) {
+void TimelineCache::insert(UnifiedDataPacket&& packet) {
     std::lock_guard<std::mutex> lg(mtx);
     Timestamp timestamp = packet.timestamp;
     CacheNode* inserted = nullptr;
-    root = insert(root, timestamp, packet, inserted);
+    root = insert(root, timestamp, std::move(packet), inserted);
     if (inserted && inserted->prev_by_time == nullptr && inserted->next_by_time == nullptr) {
         link_into_list(inserted);
         current_size++;
@@ -312,17 +312,19 @@ bool TimelineCache::remove(Timestamp timestamp) {
     return true;
 }
 
-UnifiedDataPacket TimelineCache::find(Timestamp timestamp) {
+UnifiedDataPacket* TimelineCache::query(Timestamp timestamp) {
     std::lock_guard<std::mutex> lg(mtx);
     CacheNode* n = find_node(timestamp);
-    if (n) return n->packet;
-    return UnifiedDataPacket{};
+    if (n) return &n->packet;
+    // return UnifiedDataPacket{};
+    return nullptr;
 }
 
-std::vector<UnifiedDataPacket> TimelineCache::query_range(Timestamp start_ts, Timestamp end_ts) {
+std::vector<UnifiedDataPacket*> TimelineCache::query_by_range(Timestamp start_ts, Timestamp end_ts) {
+    if (start_ts > end_ts || !root) 
+        return {};
     std::lock_guard<std::mutex> lg(mtx);
-    std::vector<UnifiedDataPacket> out;
-    if (!root || start_ts > end_ts) return out;
+    std::vector<UnifiedDataPacket*> out;
     query_range(root, start_ts, end_ts, out);
     return out;
 }

@@ -82,7 +82,6 @@ IngestionStats DataIngestionManager::get_ingestion_stats() const {
     }
 
     is.last_update_time = std::time(nullptr);
-
     return is;
 }
 

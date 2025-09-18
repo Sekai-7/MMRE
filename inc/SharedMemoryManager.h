@@ -7,10 +7,6 @@
 #include <cstddef>
 #include <atomic>
 #include <memory>
-// enum class ResourceType {
-//     TYPE_A,
-//     TYPE_B
-// };
 
 enum class ResourceType : int;
 

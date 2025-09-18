@@ -45,11 +45,55 @@ struct UnifiedDataPacket {
     Handle data_ptr;
     size_t data_size;
 
+    void* get_ptr() {
+        struct Visitor {
+            void* operator() (void* ptr) {
+                return ptr; 
+            }
+            void* operator() (SharedMemoryHandle handle) {
+                if (handle.is_valid() == false || handle.get_size() == 0)
+                    return nullptr;
+                return handle.get_ptr();
+            }
+        };
+        return std::visit(Visitor{}, data_ptr);
+    }
+
+    const void* get_ptr() const {
+        struct Visitor {
+            void* operator() (void* ptr) {
+                return ptr; 
+            }
+            void* operator() (SharedMemoryHandle handle) {
+                if (handle.is_valid() == false || handle.get_size() == 0)
+                    return nullptr;
+                return handle.get_ptr();
+            }
+        };
+        return std::visit(Visitor{}, data_ptr);
+    }
+
     UnifiedDataPacket() : timestamp(0), type(ResourceType::CAMERA), data_ptr(nullptr), data_size(0) {} // 添加默认构造函数
     UnifiedDataPacket(Timestamp ts, ResourceType t, void* ptr, size_t size) : timestamp(ts), type(t), data_ptr(ptr), data_size(size) {} // 添加构造函数
 
     UnifiedDataPacket(const UnifiedDataPacket& other) = delete;
     UnifiedDataPacket& operator=(const UnifiedDataPacket& other) = delete;
+    // UnifiedDataPacket(const UnifiedDataPacket& other) {
+    //     this->timestamp = other.timestamp;
+    //     this->type = other.type;
+    //     this->data_size = other.data_size;
+    //     if (std::get_if<SharedMemoryHandle>(&other.data_ptr)) {
+            
+    //     }
+
+    // }
+    // UnifiedDataPacket& operator=(const UnifiedDataPacket& other) {
+    //     this->timestamp = other.timestamp;
+    //     this->type = other.type;
+    //     this->data_size = other.data_size;
+    //     this->data_ptr = std::move(other.data_ptr);
+
+    // }
 
     UnifiedDataPacket(UnifiedDataPacket&& other) {
         this->timestamp = other.timestamp;
@@ -128,10 +172,10 @@ private:
     CacheNode* rotate_right(CacheNode* y);
     CacheNode* rebalance(CacheNode* n);
 
-    CacheNode* insert(CacheNode* node, Timestamp ts, const UnifiedDataPacket& packet, CacheNode*& inserted);
+    CacheNode* insert(CacheNode* node, Timestamp ts, UnifiedDataPacket&& packet, CacheNode*& inserted);
     CacheNode* remove_pureAVL(CacheNode* node, Timestamp ts, CacheNode*& deleted_node);
 
-    void query_range(CacheNode* node, Timestamp, Timestamp, std::vector<UnifiedDataPacket>& out) const;
+    void query_range(CacheNode* node, Timestamp, Timestamp, std::vector<UnifiedDataPacket*>& out) const;
 
     void destroy(CacheNode* node);
     CacheNode* find_node(Timestamp ts) const;
@@ -151,10 +195,10 @@ public:
 
     void clear();
 
-    void insert(UnifiedDataPacket packet);
+    void insert(UnifiedDataPacket&& packet);
     bool remove(Timestamp timestamp);
-    UnifiedDataPacket find(Timestamp timestamp);
-    std::vector<UnifiedDataPacket> query_range(Timestamp start_ts, Timestamp end_ts);
+    UnifiedDataPacket* query(Timestamp timestamp);
+    std::vector<UnifiedDataPacket*> query_by_range(Timestamp start_ts, Timestamp end_ts);
 
     UnifiedDataPacket evict_oldest();
     UnifiedDataPacket evict_newest();
