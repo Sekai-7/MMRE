@@ -1,19 +1,10 @@
-cmake_minimum_required(VERSION 3.16)
-project(TimelineCache)
+cmake_minimum_required(VERSION 3.22)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project(MMRE)
 
-file(GLOB_RECURSE SRC_LIST ${CMAKE_SOURCE_DIR}/*.cc)
-include_directories(${CMAKE_SOURCE_DIR}/inc)
+# add_subdirectory(./code)
 
-find_package(benchmark REQUIRED)
-find_package(Threads REQUIRED)
+enable_testing()
+add_subdirectory(./test)
 
-add_executable(TimelineCache ${SRC_LIST})
-
-target_link_libraries(TimelineCache
-    PRIVATE
-    benchmark::benchmark
-    Threads::Threads 
-)
+# add_subdirectory(./benchmark)
