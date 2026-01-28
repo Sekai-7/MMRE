@@ -17,7 +17,7 @@
 // */
 // // CacheNode 构造函数
 CacheNode::CacheNode(UnifiedDataPacket&& p)
-    : timestamp(p.timestamp), packet(std::move(p)),
+    : timestamp(p.timestamp), packet(new UnifiedDataPacket(std::move(p))),
       parent(nullptr), left(nullptr), right(nullptr),
       height(1) {}
 

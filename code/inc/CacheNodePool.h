@@ -8,7 +8,8 @@
 class CacheNode {
 public:
     long long timestamp;
-    UnifiedDataPacket packet;
+
+    std::unique_ptr<UnifiedDataPacket> packet;
 
     // AVL 指针
     CacheNode* parent;

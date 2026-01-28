@@ -31,8 +31,8 @@ public:
 
     void insert(UnifiedDataPacket&& packet);
     bool remove(Timestamp timestamp);
-    UnifiedDataPacket* query(Timestamp timestamp);
-    std::vector<UnifiedDataPacket*> queryByRange(Timestamp startTs, Timestamp endTs);
+    Handle query(Timestamp timestamp);
+    std::vector<Handle> queryByRange(Timestamp startTs, Timestamp endTs);
 
     // UnifiedDataPacket evictOldest();
     // UnifiedDataPacket evictNewest();
@@ -73,7 +73,7 @@ private:
     void deleteNode(CacheNode* node);
     void rebalanceUp(CacheNode* node);
 
-    void queryRange(CacheNode* node, Timestamp, Timestamp, std::vector<UnifiedDataPacket*>& out) const;
+    void queryRange(CacheNode* node, Timestamp, Timestamp, std::vector<Handle>& out) const;
 
     void destroy(CacheNode* node);
     CacheNode* findNode(Timestamp ts) const;

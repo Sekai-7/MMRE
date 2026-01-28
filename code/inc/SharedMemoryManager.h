@@ -7,8 +7,13 @@
 #include <cstddef>
 #include <atomic>
 #include <memory>
+#include <vector>
+
+// #include "common.h"
 
 enum class ResourceType : int;
+
+class SharedMemoryManager;
 
 // ================= SharedMemoryHandle =================
 class SharedMemoryHandle {
@@ -19,8 +24,10 @@ public:
     SharedMemoryHandle& operator=(SharedMemoryHandle&& other) noexcept;
 
     // 禁用拷贝
-    SharedMemoryHandle(const SharedMemoryHandle&) = delete;
-    SharedMemoryHandle& operator=(const SharedMemoryHandle&) = delete;
+    SharedMemoryHandle(const SharedMemoryHandle&);
+    SharedMemoryHandle& operator=(const SharedMemoryHandle&);
+
+    ~SharedMemoryHandle();
 
     bool isValid() const;
     void* getPtr() const;
@@ -31,6 +38,7 @@ private:
     uint64_t id;
     void* ptr;
     size_t size;
+    SharedMemoryManager* manager;
 };
 
 // ================= SharedMemoryManager =================
@@ -39,26 +47,47 @@ public:
     SharedMemoryManager();
     ~SharedMemoryManager();
 
-    SharedMemoryHandle allocate(size_t size, ResourceType type);
-    bool deallocate(const SharedMemoryHandle& handle);
-    int getReferenceCount(const SharedMemoryHandle& handle);
-    bool increaseReferenceCount(const SharedMemoryHandle& handle);
-    SharedMemoryHandle createHandleReference(const SharedMemoryHandle& original);
+    SharedMemoryHandle allocate(size_t size);
 
+    void deallocate(const int);
+
+    void increaseReferenceCount(const int);
 private:
-    std::mutex mutex;
-    uint64_t nextId;
-    struct MemoryBlock {
+    class MemoryBlock {
+    public:
+        MemoryBlock() : ptr(nullptr), size(0), pos(0), refCount(0) {}
+        MemoryBlock(void* ptr, size_t size, size_t pos) : ptr(ptr), size(size), pos(pos), refCount(0) {}
+        ~MemoryBlock() {}
+        friend class SharedMemoryManager;
+    private:
         void* ptr;
         size_t size;
+        size_t pos;
         std::atomic<int> refCount;
-        ResourceType type;
+        MemoryBlock* next;
     };
-    std::unordered_map<uint64_t, std::unique_ptr<MemoryBlock>> memoryMap;
 
-    // 平台适配层
-    void* allocateActualSharedMemory(size_t size);
-    void freeActualSharedMemory(void* ptr, size_t size);
+    // 平台适配
+    void initMemory();
+
+    void destroyMemory();
+
+    size_t alignSize(size_t);
+
+    int sizeToIdx(size_t);
+
+private:
+    int fd;
+    void* memory;
+    size_t memorySize;
+    std::mutex memoryMtx;
+    uint64_t nextId;
+    size_t loc;
+    std::unordered_map<uint64_t, std::unique_ptr<MemoryBlock>> memoryMap;
+    
+    std::vector<std::unique_ptr<std::mutex>> freeMtx;
+    std::vector<MemoryBlock*> freeBlocks;
+
 };
 
 #endif // SHARED_MEMORY_MANAGER_H

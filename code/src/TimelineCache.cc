@@ -119,9 +119,9 @@ CacheNode* TimelineCache::insert(CacheNode* node, UnifiedDataPacket&& packet, Ca
         // 此时不需要对list做操作
         // Timestamp可能一样吗？
         // 如何对原节点做处理？
-        currentMemoryUsage -= (long long)node->packet.dataSize;
-        node->packet = std::move(packet);
-        currentMemoryUsage += (long long)node->packet.dataSize;
+        currentMemoryUsage -= (long long)node->packet->dataSize;
+        node->packet = std::make_unique<UnifiedDataPacket>(std::move(packet));
+        currentMemoryUsage += (long long)node->packet->dataSize;
         inserted = nullptr;
         return node;
     }
@@ -190,10 +190,10 @@ void TimelineCache::refreshMinMaxAfterChange() {
     }
 }
 
-void TimelineCache::queryRange(CacheNode* node, Timestamp l, Timestamp r, std::vector<UnifiedDataPacket*>& out) const {
+void TimelineCache::queryRange(CacheNode* node, Timestamp l, Timestamp r, std::vector<Handle>& out) const {
     if (!node) return;
     if (node->timestamp > l) queryRange(node->left, l, r, out);
-    if (node->timestamp >= l && node->timestamp <= r) out.push_back(&node->packet);
+    if (node->timestamp >= l && node->timestamp <= r) out.push_back(node->packet->dataPtr);
     if (node->timestamp < r) queryRange(node->right, l, r, out);
 }
 
@@ -243,7 +243,7 @@ bool TimelineCache::remove(Timestamp timestamp) {
         return false;
     }
 
-    long long removedSize = target->packet.dataSize;
+    long long removedSize = target->packet->dataSize;
     deleteNode(target);
 
     currentSize--;
@@ -253,17 +253,17 @@ bool TimelineCache::remove(Timestamp timestamp) {
     return true;
 }
 
-UnifiedDataPacket* TimelineCache::query(Timestamp timestamp) {
+Handle TimelineCache::query(Timestamp timestamp) {
     CacheNode* n = findNode(timestamp);
-    if (n) return &n->packet;
+    if (n) return n->packet->dataPtr;
     // return UnifiedDataPacket{};
     return nullptr;
 }
 
-std::vector<UnifiedDataPacket*> TimelineCache::queryByRange(Timestamp startTs, Timestamp endTs) {
+std::vector<Handle> TimelineCache::queryByRange(Timestamp startTs, Timestamp endTs) {
     if (startTs > endTs || !root) 
         return {};
-    std::vector<UnifiedDataPacket*> out;
+    std::vector<Handle> out;
     queryRange(root, startTs, endTs, out);
     return out;
 }

@@ -1,14 +1,14 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-// #include "SharedMemoryManager.h"
+#include "SharedMemoryManager.h"
 
 #include <memory>
 #include <variant>
 // #include <chrono>
 
 using Timestamp = long long;
-// using Handle = std::variant<void*, SharedMemoryHandle>;
+using Handle = std::variant<std::shared_ptr<void*>, SharedMemoryHandle>;
 
 // 枚举表示数据类型
 enum class ResourceType {
@@ -16,7 +16,8 @@ enum class ResourceType {
     AUDIO,
     GPS,
     IMU,
-    VEHICLE_SIGNAL
+    VEHICLE_SIGNAL,
+    UNKNOWN
     // ... 其他数据类型
 };
 
@@ -24,42 +25,12 @@ enum class ResourceType {
 struct UnifiedDataPacket {
     Timestamp timestamp;
     ResourceType type;
-    void* dataPtr; // 指向共享内存的指针
-    // Handle dataPtr;
+    // void* dataPtr; // 指向共享内存的指针
+    Handle dataPtr;
     size_t dataSize;
 
-    void* getPtr() {
-        // struct Visitor {
-        //     void* operator() (void* ptr) {
-        //         return ptr; 
-        //     }
-        //     void* operator() (SharedMemoryHandle& handle) {
-        //         if (handle.isValid() == false || handle.getSize() == 0)
-        //             return nullptr;
-        //         return handle.getPtr();
-        //     }
-        // };
-        // return std::visit(Visitor{}, dataPtr);
-        return dataPtr;
-    }
-
-    const void* getPtr() const {
-        // struct Visitor {
-        //     void* operator() (void* ptr) const {
-        //         return ptr; 
-        //     }
-        //     void* operator() (const SharedMemoryHandle& handle) const {
-        //         if (handle.isValid() == false || handle.getSize() == 0)
-        //             return nullptr;
-        //         return handle.getPtr();
-        //     }
-        // };
-        // return std::visit(Visitor{}, dataPtr);
-        return dataPtr;
-    }
-
-    UnifiedDataPacket() : timestamp(0), type(ResourceType::CAMERA), dataPtr(nullptr), dataSize(0) {} // 添加默认构造函数
-    UnifiedDataPacket(Timestamp ts, ResourceType t, void* ptr, size_t size) : timestamp(ts), type(t), dataPtr(ptr), dataSize(size) {} // 添加构造函数
+    UnifiedDataPacket() : timestamp(0), type(ResourceType::CAMERA), dataPtr(), dataSize(0) {} // 添加默认构造函数
+    UnifiedDataPacket(Timestamp ts, ResourceType t, Handle ptr, size_t size) : timestamp(ts), type(t), dataPtr(ptr), dataSize(size) {} // 添加构造函数
 
     UnifiedDataPacket(const UnifiedDataPacket& other) = delete;
     UnifiedDataPacket& operator=(const UnifiedDataPacket& other) = delete;

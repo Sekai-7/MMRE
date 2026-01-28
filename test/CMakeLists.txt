@@ -7,6 +7,7 @@ add_executable(mmretest
     CacheNodePoolTest.cc
     ../code/src/TimelineCache.cc
     ../code/src/CacheNodePool.cc
+    ../code/src/SharedMemoryManager.cc
 )
 
 target_include_directories(mmretest PRIVATE ../code/inc)

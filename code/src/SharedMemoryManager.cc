@@ -1,212 +1,187 @@
 #include "SharedMemoryManager.h"
+
 #include <iostream>
-#include <cstdlib>
-#include <utility>
-
-#ifdef QCOM
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/ion.h>
-#include <unistd.h>
 #include <sys/mman.h>
-#include <cstring>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-static int ionFd = -1;
 
-void* SharedMemoryManager::allocateActualSharedMemory(size_t size) {
-    if (ionFd < 0) {
-        ionFd = open("/dev/ion", O_RDWR);
-        if (ionFd < 0) {
-            std::cerr << "[QCOM] Failed to open /dev/ion, fallback to malloc\n";
-            return malloc(size);
+
+SharedMemoryManager::SharedMemoryManager() : fd(-1), memory(nullptr), memorySize(1024 * 1024 * 1024), nextId(0), loc(0) {
+    freeMtx.resize(4);
+    freeBlocks.resize(4);
+    for (int i = 0; i < 4; ++i) {
+        freeMtx[i] = std::make_unique<std::mutex>();
+        freeBlocks[i] = new MemoryBlock();
+    }
+    initMemory();
+}
+
+SharedMemoryManager::~SharedMemoryManager() {
+    for (int i = 0; i < 4; ++i) {
+        auto* mb = freeBlocks[i];
+        while (mb != nullptr) {
+            auto* tmp = mb;
+            mb = mb->next;
+            delete tmp;
+        }
+    }
+    destroyMemory();
+}
+
+
+
+SharedMemoryHandle SharedMemoryManager::allocate(size_t size) {
+    // std::lock_guard<std::mutex> lock(mutex);
+    // void* ptr = allocateActualSharedMemory(size);
+    if (!memory) return SharedMemoryHandle();
+
+    size_t align = alignSize(size);
+    int idx = sizeToIdx(align);
+    auto id = nextId++;
+    std::unique_ptr<MemoryBlock> mb = nullptr;
+    
+    {
+        std::lock_guard<std::mutex> lock(*freeMtx[idx]);
+        if (freeBlocks[idx]->next != nullptr) {
+            mb.reset(freeBlocks[idx]->next);
+            freeBlocks[idx]->next = freeBlocks[idx]->next->next;
+            mb->refCount = 1;
         }
     }
 
-    struct ion_allocation_data alloc {};
-    alloc.len = size;
-    alloc.align = 4096;
-    alloc.heap_id_mask = 1 << ION_SYSTEM_HEAP_ID;   // 选 system heap
-    alloc.flags = 0;
+    std::lock_guard<std::mutex> lock(memoryMtx);
+    if (mb == nullptr) {
+        void* ptr = static_cast<uint8_t*>(memory) + loc;
+        loc += align;
+        if (loc >= memorySize) {
+            return SharedMemoryHandle();
+        }
 
-    if (ioctl(ionFd, ION_IOC_ALLOC, &alloc) < 0) {
-        std::cerr << "[QCOM] ION_IOC_ALLOC failed, fallback to malloc\n";
-        return malloc(size);
+        mb = std::make_unique<MemoryBlock>(ptr, align, loc - align);
     }
 
-    struct ion_fd_data fdData {};
-    fdData.handle = alloc.handle;
-
-    if (ioctl(ionFd, ION_IOC_SHARE, &fdData) < 0) {
-        std::cerr << "[QCOM] ION_IOC_SHARE failed, fallback to malloc\n";
-        return malloc(size);
-    }
-
-    void* vaddr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fdData.fd, 0);
-    if (vaddr == MAP_FAILED) {
-        std::cerr << "[QCOM] mmap failed, fallback to malloc\n";
-        return malloc(size);
-    }
-
-    std::cerr << "[QCOM] Allocated ION buffer, size=" << size << std::endl;
-    return vaddr;
+    memoryMap[id] = std::move(mb);
+    return SharedMemoryHandle(id, memoryMap[id]->ptr, size);
 }
 
-void SharedMemoryManager::freeActualSharedMemory(void* ptr, size_t size) {
-    if (!ptr) return;
-    if (munmap(ptr, size) != 0) {
-        free(ptr);
-    }
-}
+void SharedMemoryManager::deallocate(const int id) {
+    MemoryBlock* mb = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(memoryMtx);
+        auto it = memoryMap.find(id);
+        if (it == memoryMap.end()) {
+            return;
+        }
 
-
-#elif defined(NVIDIA)
-#include <nvscibuf.h>
-#include <cstring>
-
-void* SharedMemoryManager::allocateActualSharedMemory(size_t size) {
-    NvSciBufAttrList attrList;
-    NvSciBufObj bufObj;
-
-    // 创建属性列表
-    NvSciError err = NvSciBufAttrListCreate(&attrList);
-    if (err != NvSciError_Success) {
-        std::cerr << "[NVIDIA] NvSciBufAttrListCreate failed, fallback to malloc\n";
-        return malloc(size);
+        if (--(it->second->refCount) <= 0) {
+        // freeActualSharedMemory(it->second->ptr, it->second->size);
+            mb = it->second.release();
+            memoryMap.erase(it);
+        }
     }
 
-    NvSciBufAttrKeyValuePair attrs[] = {
-        { NvSciBufGeneralAttrKey_Types, (void*)&(NvSciBufType_RawBuffer), sizeof(NvSciBufType) },
-        { NvSciBufGeneralAttrKey_Size,  (void*)&size, sizeof(size_t) }
-    };
-
-    err = NvSciBufAttrListSetAttrs(attrList, attrs, 2);
-    if (err != NvSciError_Success) {
-        std::cerr << "[NVIDIA] NvSciBufAttrListSetAttrs failed, fallback to malloc\n";
-        return malloc(size);
+    if (mb != nullptr) {
+        return;
     }
 
-    err = NvSciBufObjCreate(attrList, &bufObj);
-    if (err != NvSciError_Success) {
-        std::cerr << "[NVIDIA] NvSciBufObjCreate failed, fallback to malloc\n";
-        return malloc(size);
+    {
+        std::lock_guard<std::mutex> lock(*freeMtx[sizeToIdx(mb->size)]);
+        mb->next = freeBlocks[sizeToIdx(mb->size)]->next;
+        freeBlocks[sizeToIdx(mb->size)]->next = mb;
     }
 
-    void* ptr = nullptr;
-    size_t actualSize = 0;
-    err = NvSciBufObjGetCpuPtr(bufObj, &ptr, &actualSize);
-    if (err != NvSciError_Success || !ptr) {
-        std::cerr << "[NVIDIA] NvSciBufObjGetCpuPtr failed, fallback to malloc\n";
-        return malloc(size);
+    return;
+}
+
+void SharedMemoryManager::increaseReferenceCount(const int id) {
+    std::lock_guard<std::mutex> lock(memoryMtx);
+    auto it = memoryMap.find(id);
+    if (it == memoryMap.end()) {
+        return;
     }
-
-    std::cerr << "[NVIDIA] Allocated NvSciBuf, size=" << actualSize << std::endl;
-    return ptr;
-}
-
-void SharedMemoryManager::freeActualSharedMemory(void* ptr, size_t size) {
-    if (!ptr) return;
-    // NOTE: NvSciBuf 的释放通常需要调用 NvSciBufObjFree
-    // 这里示意：如果不是 NvSci 分配的，就 free
-    free(ptr);
-}
-
-
-#else
-#include <sys/mman.h>
-#include <unistd.h>
-
-void* SharedMemoryManager::allocateActualSharedMemory(size_t size) {
-    void* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE,
-                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (ptr == MAP_FAILED) {
-        std::cerr << "[DEFAULT] mmap failed, fallback to malloc\n";
-        return malloc(size);
-    }
-    std::cerr << "[DEFAULT] mmap allocated\n";
-    return ptr;
-}
-
-void SharedMemoryManager::freeActualSharedMemory(void* ptr, size_t size) {
-    if (!ptr) return;
-    if (munmap(ptr, size) != 0) {
-        free(ptr);
-    }
-}
-#endif
-
-// ================= 公共逻辑实现 =================
-SharedMemoryManager::SharedMemoryManager() : nextId(1) {}
-
-SharedMemoryManager::~SharedMemoryManager() {
-    std::lock_guard<std::mutex> lock(mutex);
-    for (auto& pair : memoryMap) {
-        freeActualSharedMemory(pair.second->ptr, pair.second->size);
-    }
-}
-
-SharedMemoryHandle SharedMemoryManager::allocate(size_t size, ResourceType type) {
-    std::lock_guard<std::mutex> lock(mutex);
-    void* ptr = allocateActualSharedMemory(size);
-    if (!ptr) return SharedMemoryHandle();
-
-    uint64_t id = nextId++;
-    auto block = std::make_unique<MemoryBlock>();
-    block->ptr = ptr;
-    block->size = size;
-    block->refCount = 1;
-    block->type = type;
-
-    memoryMap[id] = std::move(block);
-    return SharedMemoryHandle(id, ptr, size);
-}
-
-bool SharedMemoryManager::deallocate(const SharedMemoryHandle& handle) {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = memoryMap.find(handle.getId());
-    if (it == memoryMap.end()) return false;
-
-    if (--(it->second->refCount) <= 0) {
-        freeActualSharedMemory(it->second->ptr, it->second->size);
-        memoryMap.erase(it);
-    }
-    return true;
-}
-
-int SharedMemoryManager::getReferenceCount(const SharedMemoryHandle& handle) {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = memoryMap.find(handle.getId());
-    if (it == memoryMap.end()) return 0;
-    return it->second->refCount.load();
-}
-
-bool SharedMemoryManager::increaseReferenceCount(const SharedMemoryHandle& handle) {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = memoryMap.find(handle.getId());
-    if (it == memoryMap.end()) return false;
     it->second->refCount++;
-    return true;
+    return;
 }
 
-SharedMemoryHandle SharedMemoryManager::createHandleReference(const SharedMemoryHandle& original) {
-    if (!increaseReferenceCount(original)) return SharedMemoryHandle();
+void SharedMemoryManager::initMemory() {
+    fd = shm_open("/MMRE", O_CREAT | O_RDWR, 0666);
+    if (fd == -1) {
+        std::cerr << "[DEFAULT] shm_open failed\n";
+    } else {
+        ftruncate(fd, memorySize);
+        memory = mmap(nullptr, memorySize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        if (memory == MAP_FAILED) {
+            std::cerr << "[DEFAULT] mmap failed\n";
+        } else {
+            std::cout << "[DEFAULT] mmap success\n";
+        }
+    }
+}
 
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = memoryMap.find(original.getId());
-    if (it == memoryMap.end()) return SharedMemoryHandle();
-    return SharedMemoryHandle(it->first, it->second->ptr, it->second->size);
+void SharedMemoryManager::destroyMemory() {
+    munmap(memory, memorySize);
+    close(fd);
+    shm_unlink("/MMRE");
+    return;
+}
+
+size_t SharedMemoryManager::alignSize(size_t size) {
+    if (size <= 4 * 1024) {
+        return 4 * 1024;
+    } else if (size <= 512 * 1024) {
+        return 512 * 1024;
+    } else if (size <= 4 * 1024 * 1024) {
+        return 4 * 1024 * 1024;
+    } else if (size <= 12 * 1024 * 1024) {
+        return 12 * 1024 * 1024;
+    }
+    return (size + 4095) & ~4095;
+}
+
+int SharedMemoryManager::sizeToIdx(size_t size) {
+    if (size == 4 * 1024) {
+        return 0;
+    } else if (size == 512 * 1024) {
+        return 1;
+    } else if (size == 4 * 1024 * 1024) {
+        return 2;
+    } else if (size == 12 * 1024 * 1024) {
+        return 3;
+    }
+    return -1;
 }
 
 // ================= SharedMemoryHandle =================
+
 SharedMemoryHandle::SharedMemoryHandle() : id(0), ptr(nullptr), size(0) {}
 
 SharedMemoryHandle::SharedMemoryHandle(uint64_t id, void* ptr, size_t size)
     : id(id), ptr(ptr), size(size) {}
 
+SharedMemoryHandle::SharedMemoryHandle(const SharedMemoryHandle& handle) : id(handle.id), ptr(handle.ptr), size(handle.size), manager(handle.manager) {
+    manager->increaseReferenceCount(id);
+    return;
+}
+
+SharedMemoryHandle& SharedMemoryHandle::operator=(const SharedMemoryHandle& handle) {
+    if (this != &handle) {
+        id = handle.id;
+        ptr = handle.ptr;
+        size = handle.size;
+        manager = handle.manager;
+        manager->increaseReferenceCount(id);
+    }
+    return *this;
+}
+
 SharedMemoryHandle::SharedMemoryHandle(SharedMemoryHandle&& other) noexcept
-    : id(other.id), ptr(other.ptr), size(other.size) {
+    : id(other.id), ptr(other.ptr), size(other.size), manager(other.manager) {
     other.id = 0;
     other.ptr = nullptr;
     other.size = 0;
+    other.manager = nullptr;
 }
 
 SharedMemoryHandle& SharedMemoryHandle::operator=(SharedMemoryHandle&& other) noexcept {
@@ -214,11 +189,24 @@ SharedMemoryHandle& SharedMemoryHandle::operator=(SharedMemoryHandle&& other) no
         id = other.id;
         ptr = other.ptr;
         size = other.size;
+        manager = other.manager;
         other.id = 0;
         other.ptr = nullptr;
         other.size = 0;
+        other.manager = nullptr;
     }
     return *this;
+}
+
+SharedMemoryHandle::~SharedMemoryHandle() {
+    if (manager != nullptr) {
+        manager->deallocate(id);
+        manager = nullptr;
+    }
+    id = -1;
+    ptr = nullptr;
+    size = 0;
+    return; 
 }
 
 bool SharedMemoryHandle::isValid() const { return ptr != nullptr; }

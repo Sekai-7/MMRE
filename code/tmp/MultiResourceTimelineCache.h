@@ -59,7 +59,6 @@ public:
     }
 
     // 插入数据
-    // bool insertData(ResourceType type, Timestamp timestamp, const RawResourceData& rawData);
     bool insert(UnifiedDataPacket&&);
 
     // 查询数据
