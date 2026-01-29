@@ -18,12 +18,11 @@ class SharedMemoryManager;
 // ================= SharedMemoryHandle =================
 class SharedMemoryHandle {
 public:
-    SharedMemoryHandle();
-    SharedMemoryHandle(uint64_t id, void* ptr, size_t size);
+    SharedMemoryHandle(SharedMemoryManager*);
+    SharedMemoryHandle(uint64_t id, void* ptr, size_t size, SharedMemoryManager* manager);
     SharedMemoryHandle(SharedMemoryHandle&& other) noexcept;
     SharedMemoryHandle& operator=(SharedMemoryHandle&& other) noexcept;
 
-    // 禁用拷贝
     SharedMemoryHandle(const SharedMemoryHandle&);
     SharedMemoryHandle& operator=(const SharedMemoryHandle&);
 
@@ -49,14 +48,14 @@ public:
 
     SharedMemoryHandle allocate(size_t size);
 
-    void deallocate(const int);
+    void deallocate(const uint64_t);
 
-    void increaseReferenceCount(const int);
+    void increaseReferenceCount(const uint64_t);
 private:
     class MemoryBlock {
     public:
-        MemoryBlock() : ptr(nullptr), size(0), pos(0), refCount(0) {}
-        MemoryBlock(void* ptr, size_t size, size_t pos) : ptr(ptr), size(size), pos(pos), refCount(0) {}
+        MemoryBlock() : ptr(nullptr), size(0), pos(0), refCount(1), next(nullptr) {}
+        MemoryBlock(void* ptr, size_t size, size_t pos) : ptr(ptr), size(size), pos(pos), refCount(1), next(nullptr) {}
         ~MemoryBlock() {}
         friend class SharedMemoryManager;
     private:

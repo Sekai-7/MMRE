@@ -5,9 +5,12 @@ project(MMRE)
 add_executable(mmretest 
     TimelineCacheTest.cc
     CacheNodePoolTest.cc
+    SharedMemoryManagerTest.cc
+    MultiResourceCheckpointManagerTest.cc
     ../code/src/TimelineCache.cc
     ../code/src/CacheNodePool.cc
     ../code/src/SharedMemoryManager.cc
+    ../code/src/MultiResourceCheckpointManager.cc
 )
 
 target_include_directories(mmretest PRIVATE ../code/inc)

@@ -8,7 +8,7 @@
 
 
 
-SharedMemoryManager::SharedMemoryManager() : fd(-1), memory(nullptr), memorySize(1024 * 1024 * 1024), nextId(0), loc(0) {
+SharedMemoryManager::SharedMemoryManager() : fd(-1), memory(nullptr), memorySize(1024 * 1024 * 1024), nextId(1), loc(0) {
     freeMtx.resize(4);
     freeBlocks.resize(4);
     for (int i = 0; i < 4; ++i) {
@@ -35,11 +35,13 @@ SharedMemoryManager::~SharedMemoryManager() {
 SharedMemoryHandle SharedMemoryManager::allocate(size_t size) {
     // std::lock_guard<std::mutex> lock(mutex);
     // void* ptr = allocateActualSharedMemory(size);
-    if (!memory) return SharedMemoryHandle();
+    if (memory == nullptr) return SharedMemoryHandle(this);
 
     size_t align = alignSize(size);
     int idx = sizeToIdx(align);
-    auto id = nextId++;
+    if (idx == -1) {
+        return SharedMemoryHandle(this);
+    }
     std::unique_ptr<MemoryBlock> mb = nullptr;
     
     {
@@ -52,21 +54,22 @@ SharedMemoryHandle SharedMemoryManager::allocate(size_t size) {
     }
 
     std::lock_guard<std::mutex> lock(memoryMtx);
+    auto id = nextId++;
     if (mb == nullptr) {
         void* ptr = static_cast<uint8_t*>(memory) + loc;
         loc += align;
-        if (loc >= memorySize) {
-            return SharedMemoryHandle();
+        if (loc > memorySize) {
+            return SharedMemoryHandle(this);
         }
 
         mb = std::make_unique<MemoryBlock>(ptr, align, loc - align);
     }
 
     memoryMap[id] = std::move(mb);
-    return SharedMemoryHandle(id, memoryMap[id]->ptr, size);
+    return SharedMemoryHandle(id, memoryMap[id]->ptr, size, this);
 }
 
-void SharedMemoryManager::deallocate(const int id) {
+void SharedMemoryManager::deallocate(const uint64_t id) {
     MemoryBlock* mb = nullptr;
     {
         std::lock_guard<std::mutex> lock(memoryMtx);
@@ -82,7 +85,7 @@ void SharedMemoryManager::deallocate(const int id) {
         }
     }
 
-    if (mb != nullptr) {
+    if (mb == nullptr) {
         return;
     }
 
@@ -95,7 +98,7 @@ void SharedMemoryManager::deallocate(const int id) {
     return;
 }
 
-void SharedMemoryManager::increaseReferenceCount(const int id) {
+void SharedMemoryManager::increaseReferenceCount(const uint64_t id) {
     std::lock_guard<std::mutex> lock(memoryMtx);
     auto it = memoryMap.find(id);
     if (it == memoryMap.end()) {
@@ -114,6 +117,10 @@ void SharedMemoryManager::initMemory() {
         memory = mmap(nullptr, memorySize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (memory == MAP_FAILED) {
             std::cerr << "[DEFAULT] mmap failed\n";
+            memory = nullptr;
+            close(fd);
+            shm_unlink("/MMRE");
+            fd = -1;
         } else {
             std::cout << "[DEFAULT] mmap success\n";
         }
@@ -155,23 +162,30 @@ int SharedMemoryManager::sizeToIdx(size_t size) {
 
 // ================= SharedMemoryHandle =================
 
-SharedMemoryHandle::SharedMemoryHandle() : id(0), ptr(nullptr), size(0) {}
+SharedMemoryHandle::SharedMemoryHandle(SharedMemoryManager* manager) : id(-1), ptr(nullptr), size(0), manager(manager) {}
 
-SharedMemoryHandle::SharedMemoryHandle(uint64_t id, void* ptr, size_t size)
-    : id(id), ptr(ptr), size(size) {}
+SharedMemoryHandle::SharedMemoryHandle(uint64_t id, void* ptr, size_t size, SharedMemoryManager* manager)
+    : id(id), ptr(ptr), size(size), manager(manager) {}
 
 SharedMemoryHandle::SharedMemoryHandle(const SharedMemoryHandle& handle) : id(handle.id), ptr(handle.ptr), size(handle.size), manager(handle.manager) {
-    manager->increaseReferenceCount(id);
+    if (manager != nullptr) {
+        manager->increaseReferenceCount(id);
+    }
     return;
 }
 
 SharedMemoryHandle& SharedMemoryHandle::operator=(const SharedMemoryHandle& handle) {
     if (this != &handle) {
+        if (manager != nullptr) {
+            manager->deallocate(id);
+        }
         id = handle.id;
         ptr = handle.ptr;
         size = handle.size;
         manager = handle.manager;
-        manager->increaseReferenceCount(id);
+        if (manager != nullptr) {
+            manager->increaseReferenceCount(id);
+        }
     }
     return *this;
 }
@@ -186,6 +200,9 @@ SharedMemoryHandle::SharedMemoryHandle(SharedMemoryHandle&& other) noexcept
 
 SharedMemoryHandle& SharedMemoryHandle::operator=(SharedMemoryHandle&& other) noexcept {
     if (this != &other) {
+        if (manager != nullptr) {
+            manager->deallocate(id);
+        }
         id = other.id;
         ptr = other.ptr;
         size = other.size;

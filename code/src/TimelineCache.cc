@@ -257,7 +257,7 @@ Handle TimelineCache::query(Timestamp timestamp) {
     CacheNode* n = findNode(timestamp);
     if (n) return n->packet->dataPtr;
     // return UnifiedDataPacket{};
-    return nullptr;
+    return Handle();
 }
 
 std::vector<Handle> TimelineCache::queryByRange(Timestamp startTs, Timestamp endTs) {

@@ -5,13 +5,12 @@
 
 #include <set>
 #include <shared_mutex>
-#include <optional>
 #include <vector>
 
 class MultiResourceCheckpointManager {
 private:
     std::set<Timestamp> checkpoints;
-    mutable std::shared_mutex checkpointsMutex;
+    mutable std::mutex checkpointsMutex;
 public:
     MultiResourceCheckpointManager() = default; 
     ~MultiResourceCheckpointManager() = default;
@@ -24,9 +23,9 @@ public:
     std::vector<Timestamp> queryCheckpointsBefore(Timestamp) const;
     std::vector<Timestamp> queryCheckpointsRange(Timestamp, Timestamp) const;
 
-    std::optional<Timestamp> findNearestCheckpoint(Timestamp) const;
-    std::optional<Timestamp> getLatestCheckpoint() const;
-    std::optional<Timestamp> getEarliestCheckpoint() const;
+    Timestamp findNearestCheckpoint(Timestamp) const;
+    Timestamp getLatestCheckpoint() const;
+    Timestamp getEarliestCheckpoint() const;
 
     size_t getCheckpointCount() const;
 
