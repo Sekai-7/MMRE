@@ -5,7 +5,6 @@
 #include <variant>
 #include "Types.hpp"
 #include "SharedMemoryPtr.hpp"
-#include "UnifiedDataPacket.hpp" // Included to access PayloadBuffer definition
 
 namespace mmre {
 namespace ingestion {
@@ -21,8 +20,8 @@ struct RawProviderData {
     uint32_t subResourceIdHash;
     uint32_t pluginSchemaId{0};
     
-    // Aligns with OCP extensibility buffer
-    std::variant<engine_core::PayloadBuffer, memory::SharedMemoryPtr> payload;
+    // Aligns with OCP extensibility buffer, fully decoupled from engine_core
+    std::variant<common::PayloadBuffer, memory::SharedMemoryPtr> payload;
 };
 
 /**

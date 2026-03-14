@@ -7,6 +7,7 @@
 #include <cstdint>
 #include "Types.hpp"
 #include "TimelineCache.hpp"
+#include "IQueryCursor.hpp"
 
 namespace mmre {
 namespace engine_core {
@@ -41,9 +42,10 @@ public:
      * @brief Orchestrates execution based on data locality.
      * If data is hot, resolves future immediately.
      * If data is cold, dispatches to UFS worker pool to prevent blocking Agent RPC.
-     * Applies filterPredicate close to the data source to minimize memory bandwidth usage.
+     * Returns a cursor instead of a complete vector to completely eliminate the risk
+     * of memory explosion during massive time-range queries.
      */
-    std::future<std::vector<engine_core::DataSnapshot>> ExecuteQuery(const QueryRequest& req);
+    std::future<std::unique_ptr<IQueryCursor>> ExecuteQuery(const QueryRequest& req);
 
 private:
     std::shared_ptr<engine_core::TimelineCache> cache_;

@@ -21,20 +21,21 @@ public:
      * @return Handle to the allocated memory.
      */
     common::SharedMemoryHandle Allocate(uint32_t size);
-
-    /**
-     * @brief Decrements the reference count of a shared memory block. 
-     * Frees it if count reaches zero.
-     * @param handle The shared memory handle.
-     */
-    void Release(const common::SharedMemoryHandle& handle);
     
     /**
-     * @brief Retrives the raw pointer in the current process's address space.
+     * @brief Retrives the raw pointer mapped in the current process's address space,
+     * wrapped in a C++11 std::shared_ptr with a custom deleter. 
+     * This enforces strict RAII, completely eliminating the risk of SHM leaks.
      * @param handle The shared memory handle.
-     * @return Raw pointer to the data.
+     * @return RAII wrapped pointer to the data.
      */
-    void* GetPointer(const common::SharedMemoryHandle& handle);
+    std::shared_ptr<void> GetPointer(const common::SharedMemoryHandle& handle);
+
+private:
+    /**
+     * @brief Internal method used by custom deleter to decrement ref count.
+     */
+    void Release(const common::SharedMemoryHandle& handle);
 };
 
 } // namespace memory

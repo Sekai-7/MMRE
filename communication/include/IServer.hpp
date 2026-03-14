@@ -38,6 +38,12 @@ public:
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual void SetCallback(RequestCallback callback) = 0;
+
+    /**
+     * @brief Pushes an asynchronous event (e.g. from TriggerManager) directly to connected Agents.
+     * Resolves the "Missing Push/Pub-Sub Interface" architectural flaw.
+     */
+    virtual void PushEvent(const std::vector<uint8_t>& eventPayload) = 0;
 };
 
 } // namespace communication

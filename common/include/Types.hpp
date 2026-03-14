@@ -44,6 +44,16 @@ struct SmallString {
 };
 
 /**
+ * @brief Generic buffer for inlining small payloads (e.g. primitives, strings) 
+ * without heap allocation, avoiding rigid std::variant types.
+ * Moved to common layer to decouple HAL ingestion from engine_core.
+ */
+struct PayloadBuffer {
+    uint8_t data[64]{0};
+    uint32_t size{0};
+};
+
+/**
  * @brief Granular error codes to prevent semantic loss across subsystem boundaries.
  */
 enum class StatusCode : uint8_t {
