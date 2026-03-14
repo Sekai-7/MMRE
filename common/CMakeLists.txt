@@ -1,0 +1,2 @@
+add_library(mmre_common INTERFACE)
+target_include_directories(mmre_common INTERFACE include)
