@@ -29,9 +29,12 @@ struct IpcResponse {
  */
 class IServer {
 public:
-    // Fixed: Strongly typed binary payload for IPC instead of std::string to avoid 
-    // serialization/deserialization overhead and preserve type safety.
-    using RequestCallback = std::function<IpcResponse(const std::vector<uint8_t>& requestPayload)>;
+    using ReplyCallback = std::function<void(const IpcResponse& response)>;
+
+    // Fixed: Transformed from synchronous return to asynchronous continuation (ReplyCallback).
+    // This strictly prevents long-tail operations (like UFS disk seeks) from blocking 
+    // the networking IO Reactor threads.
+    using RequestCallback = std::function<void(const std::vector<uint8_t>& requestPayload, ReplyCallback reply)>;
 
     virtual ~IServer() = default;
 

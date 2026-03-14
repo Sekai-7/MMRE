@@ -39,7 +39,10 @@ public:
     common::SystemStatus Run();
 
 private:
-    communication::IpcResponse HandleClientRequest(const std::vector<uint8_t>& payload);
+    /**
+     * @brief Handles incoming IPC requests asynchronously to avoid blocking the Reactor.
+     */
+    void HandleClientRequest(const std::vector<uint8_t>& payload, communication::IServer::ReplyCallback reply);
 
     common::EngineConfig config_;
 

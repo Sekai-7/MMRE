@@ -50,9 +50,10 @@ public:
 
     /**
      * @brief Start capturing hardware data on a specific fine-grained channel.
-     * Resolves the "coarse control" issue by addressing specific multi-modal streams.
+     * Fixed: Added channelConfigJson to allow Agent to control dynamic hardware parameters
+     * (e.g. resolution, FPS, sampling rate) avoiding a completely blind channel start.
      */
-    virtual void StartChannel(uint32_t subResourceIdHash) = 0;
+    virtual void StartChannel(uint32_t subResourceIdHash, const std::string& channelConfigJson) = 0;
 
     /**
      * @brief Stop capturing on a specific fine-grained channel.
