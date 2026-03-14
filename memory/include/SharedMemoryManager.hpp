@@ -10,7 +10,7 @@ namespace memory {
 /**
  * @brief Manages POSIX/System V shared memory lifecycle and allocation for large data blobs.
  */
-class SharedMemoryManager {
+class SharedMemoryManager : public std::enable_shared_from_this<SharedMemoryManager> {
 public:
     SharedMemoryManager() = default;
     ~SharedMemoryManager() = default;
@@ -31,9 +31,9 @@ public:
      */
     std::shared_ptr<void> GetPointer(const common::SharedMemoryHandle& handle);
 
-private:
     /**
      * @brief Internal method used by custom deleter to decrement ref count.
+     * Public so custom deleters in other classes (like SharedMemoryPtr) can use it securely.
      */
     void Release(const common::SharedMemoryHandle& handle);
 };

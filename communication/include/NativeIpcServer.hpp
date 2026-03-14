@@ -17,7 +17,9 @@ public:
     void Start() override;
     void Stop() override;
     void SetCallback(RequestCallback callback) override;
-    void PushEvent(const std::vector<uint8_t>& eventPayload) override;
+    void PushEvent(const std::string& topic, 
+                   const std::vector<uint8_t>& eventPayload,
+                   const std::vector<memory::SharedMemoryHandle>& shmHandles) override;
 
 private:
     std::string socketPath_;

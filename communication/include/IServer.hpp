@@ -12,7 +12,7 @@ namespace communication {
 
 /**
  * @brief Structured response allowing zero-copy transmission of SHM handles
- * alongside formatting metadata and textual payloads.
+ * alongside formatting metadata and textual payloads (DTO Pattern).
  */
 struct IpcResponse {
     common::StatusCode status;
@@ -40,10 +40,18 @@ public:
     virtual void SetCallback(RequestCallback callback) = 0;
 
     /**
-     * @brief Pushes an asynchronous event (e.g. from TriggerManager) directly to connected Agents.
-     * Resolves the "Missing Push/Pub-Sub Interface" architectural flaw.
+     * @brief Pushes an asynchronous event directly to connected Agents.
+     * Fixed: Added 'topic' for pub/sub routing to prevent IPC broadcast storms.
+     * Fixed: Added DTO separation allowing shared memory handles to be passed 
+     * out of process without leaking local DataSnapshot/SharedMemoryPtr memory contexts.
+     * 
+     * @param topic Routing topic (e.g. Agent ID, Resource Type, or Event Name)
+     * @param eventPayload Binary metadata for the event
+     * @param shmHandles Zero-copy data handles for the event (if any)
      */
-    virtual void PushEvent(const std::vector<uint8_t>& eventPayload) = 0;
+    virtual void PushEvent(const std::string& topic, 
+                           const std::vector<uint8_t>& eventPayload,
+                           const std::vector<memory::SharedMemoryHandle>& shmHandles) = 0;
 };
 
 } // namespace communication

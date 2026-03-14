@@ -1,51 +1,35 @@
 #pragma once
 
 #include <cstdint>
-#include <atomic>
+#include <memory>
+#include "SharedMemoryHandle.hpp"
 
 namespace mmre {
 namespace memory {
 
-/**
- * @brief Plain Old Data (POD) struct for shared memory cross-process exchange.
- * 仅用于通过 IPC 发送。
- */
-struct SharedMemoryHandle {
-    uint32_t poolId;
-    uint32_t blockId;
-    uint64_t offset;
-    uint32_t size;
-};
-
-// Forward declaration of Manager to handle release
 class SharedMemoryManager;
 
 /**
  * @brief RAII wrapper for shared memory handles ensuring zero-leak lifecycle.
- * 在引用计数降为 0 时自动通知大页内存池回收块。
+ * Fixed: Replaced manual raw pointer ref-counting with std::shared_ptr and std::weak_ptr
+ * to eliminate Use-After-Free and Dangling Pointer UB risks.
  */
 class SharedMemoryPtr {
 public:
-    SharedMemoryPtr(SharedMemoryHandle handle, SharedMemoryManager* manager);
-    ~SharedMemoryPtr();
+    SharedMemoryPtr() = default;
 
-    // Copy semantics (increments ref count atomically)
-    SharedMemoryPtr(const SharedMemoryPtr& other);
-    SharedMemoryPtr& operator=(const SharedMemoryPtr& other);
+    /**
+     * @brief Constructs a new managed SHM pointer, capturing a weak_ptr to the manager.
+     */
+    SharedMemoryPtr(common::SharedMemoryHandle handle, std::weak_ptr<SharedMemoryManager> manager);
 
-    // Move semantics (transfers ownership without altering ref count)
-    SharedMemoryPtr(SharedMemoryPtr&& other) noexcept;
-    SharedMemoryPtr& operator=(SharedMemoryPtr&& other) noexcept;
+    const common::SharedMemoryHandle& GetHandle() const;
 
-    const SharedMemoryHandle& GetHandle() const { return handle_; }
-    void* GetRawPointer() const; 
+    bool IsValid() const { return handlePtr_ != nullptr; }
 
 private:
-    SharedMemoryHandle handle_;
-    SharedMemoryManager* manager_{nullptr};
-    
-    void AddRef();
-    void ReleaseRef();
+    // Holds the handle and manages lifecycle via a custom deleter
+    std::shared_ptr<common::SharedMemoryHandle> handlePtr_;
 };
 
 } // namespace memory

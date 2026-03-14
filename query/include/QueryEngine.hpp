@@ -7,7 +7,6 @@
 #include <cstdint>
 #include "Types.hpp"
 #include "TimelineCache.hpp"
-#include "IQueryCursor.hpp"
 
 namespace mmre {
 namespace engine_core {
@@ -31,6 +30,14 @@ struct QueryRequest {
 };
 
 /**
+ * @brief Metadata returned to Agent upon initializing a successful query.
+ */
+struct CursorResponse {
+    uint64_t cursorId{0};          // Globally unique ID across the IPC boundary
+    uint32_t totalEstimatedCount{0}; // Hint for the Agent to pre-allocate buffers
+};
+
+/**
  * @brief Facade mapping requests to Fast Path (RAM) or Slow Path (UFS).
  */
 class QueryEngine {
@@ -40,12 +47,23 @@ public:
 
     /**
      * @brief Orchestrates execution based on data locality.
-     * If data is hot, resolves future immediately.
-     * If data is cold, dispatches to UFS worker pool to prevent blocking Agent RPC.
-     * Returns a cursor instead of a complete vector to completely eliminate the risk
-     * of memory explosion during massive time-range queries.
+     * Fixed: Returns a stateless `cursorId` (CursorResponse) instead of a local polymorphic C++ object.
+     * This establishes a firm IPC boundary, allowing the remote FDBus/UDS Agent to safely stream results.
      */
-    std::future<std::unique_ptr<IQueryCursor>> ExecuteQuery(const QueryRequest& req);
+    std::future<CursorResponse> ExecuteQuery(const QueryRequest& req);
+
+    /**
+     * @brief Fetches a batch of data tied to a specific session cursor across the IPC boundary.
+     * @param cursorId The unique session identifier returned by ExecuteQuery.
+     * @param batchSize The maximum number of elements to fetch.
+     * @return A vector of snapshots. The Agent must convert these to DTOs in the communication layer.
+     */
+    std::vector<engine_core::DataSnapshot> FetchCursorBatch(uint64_t cursorId, size_t batchSize = 100);
+
+    /**
+     * @brief Closes the cursor and frees server-side resources.
+     */
+    void CloseCursor(uint64_t cursorId);
 
 private:
     std::shared_ptr<engine_core::TimelineCache> cache_;

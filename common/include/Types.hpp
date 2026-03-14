@@ -49,8 +49,9 @@ struct SmallString {
  * Moved to common layer to decouple HAL ingestion from engine_core.
  */
 struct PayloadBuffer {
-    uint8_t data[64]{0};
+    uint32_t typeTag{0}; // Runtime type identification (RTTI) tag to prevent unsafe casting
     uint32_t size{0};
+    uint8_t data[56]{0}; // Kept to 56 bytes to maintain 64-byte total alignment
 };
 
 /**
