@@ -2,8 +2,8 @@
 
 #include <string>
 #include <functional>
-#include "mmre/common/Types.hpp"
-#include "mmre/common/SharedMemoryHandle.hpp"
+#include "Types.hpp"
+#include "SharedMemoryHandle.hpp"
 
 namespace mmre {
 namespace client {

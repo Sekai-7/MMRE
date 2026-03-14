@@ -2,7 +2,7 @@
 
 #include <string>
 #include <memory>
-#include "mmre/common/SharedMemoryHandle.hpp"
+#include "SharedMemoryHandle.hpp"
 
 namespace mmre {
 namespace memory {

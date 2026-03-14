@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "mmre/query/QueryEngine.hpp"
+#include "QueryEngine.hpp"
 
 namespace mmre {
 namespace query {

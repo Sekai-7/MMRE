@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mmre/communication/IServer.hpp"
+#include "IServer.hpp"
 #include <string>
 
 namespace mmre {

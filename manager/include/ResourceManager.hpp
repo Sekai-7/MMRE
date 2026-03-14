@@ -2,14 +2,16 @@
 
 #include <memory>
 #include <string>
-#include "mmre/common/Config.hpp"
-#include "mmre/engine_core/TimelineCache.hpp"
-#include "mmre/engine_core/PersistenceEngine.hpp"
-#include "mmre/engine_core/TriggerManager.hpp"
-#include "mmre/engine_core/CheckpointManager.hpp"
-#include "mmre/ingestion/DataIngestionManager.hpp"
-#include "mmre/query/QueryEngine.hpp"
-#include "mmre/communication/IServer.hpp"
+#include <vector>
+#include "Config.hpp"
+#include "Types.hpp"
+#include "TimelineCache.hpp"
+#include "PersistenceEngine.hpp"
+#include "TriggerManager.hpp"
+#include "CheckpointManager.hpp"
+#include "DataIngestionManager.hpp"
+#include "QueryEngine.hpp"
+#include "IServer.hpp"
 
 namespace mmre {
 namespace manager {
@@ -25,8 +27,15 @@ public:
     explicit ResourceManager(const common::EngineConfig& config);
     ~ResourceManager();
 
-    void Initialize();
-    void Run();
+    /**
+     * @brief Initializes the entire system, returning a specific status code on failure.
+     */
+    common::SystemStatus Initialize();
+
+    /**
+     * @brief Starts all internal reactors and event loops.
+     */
+    common::SystemStatus Run();
 
 private:
     std::string HandleClientRequest(const std::string& payload);
@@ -37,10 +46,10 @@ private:
     std::shared_ptr<engine_core::PersistenceEngine> persistence_;
     std::shared_ptr<engine_core::TriggerManager> triggers_;
     std::shared_ptr<engine_core::CheckpointManager> checkpointMgr_;
-    
+
     std::shared_ptr<query::QueryEngine> queryEngine_;
     std::shared_ptr<ingestion::DataIngestionManager> ingestion_;
-    
+
     std::vector<std::unique_ptr<communication::IServer>> servers_;
 };
 

@@ -1,0 +1,69 @@
+#pragma once
+
+#include <cstdint>
+#include <string_view>
+
+namespace mmre {
+namespace common {
+
+/**
+ * @brief Enum defining all supported multi-modal resource types.
+ */
+enum class ResourceType : uint8_t {
+    VEHICLE_SIGNAL = 0,
+    CAMERA_FRAME = 1,
+    AUDIO_STREAM = 2,
+    SCREEN_CAPTURE = 3,
+    SYSTEM_LOG = 4,
+    UNKNOWN = 255
+};
+
+/**
+ * @brief Nanosecond-precision timestamp for unified time alignment.
+ * 建议在硬件层面与 CLOCK_REALTIME 或系统全局 PTP 时钟同步。
+ */
+using TimestampNs = uint64_t;
+
+/**
+ * @brief Zero-allocation small string buffer for system logs / explainable text.
+ * Fits well within standard cache lines.
+ */
+struct SmallString {
+    static constexpr size_t MAX_LEN = 55;
+    char data[MAX_LEN];
+    uint8_t len{0};
+
+    void assign(std::string_view sv) {
+        len = static_cast<uint8_t>(sv.length() > MAX_LEN ? MAX_LEN : sv.length());
+        __builtin_memcpy(data, sv.data(), len);
+    }
+};
+
+/**
+ * @brief Granular error codes to prevent semantic loss across subsystem boundaries.
+ */
+enum class StatusCode : uint8_t {
+    SUCCESS = 0,
+    ERR_OOM_CACHE_POOL = 1,
+    ERR_STALE_TIMESTAMP = 2,
+    ERR_SHM_MAPPING_FAILED = 3,
+    ERR_PROVIDER_INIT_FAILED = 4,
+    ERR_INVALID_CONFIG = 5,
+    ERR_UFS_IO_TIMEOUT = 6,
+    ERR_PREDICATE_EVAL_FAILED = 7
+};
+
+/**
+ * @brief Unified return status for operations to replace coarse-grained bool returns.
+ */
+struct SystemStatus {
+    StatusCode code{StatusCode::SUCCESS};
+    const char* message{nullptr};
+
+    bool IsSuccess() const { return code == StatusCode::SUCCESS; }
+    static SystemStatus Success() { return {StatusCode::SUCCESS, "Success"}; }
+    static SystemStatus Error(StatusCode c, const char* msg) { return {c, msg}; }
+};
+
+} // namespace common
+} // namespace mmre

@@ -2,8 +2,8 @@
 
 #include <memory>
 #include <string>
-#include "mmre/engine_core/UnifiedDataPacket.hpp"
-#include "mmre/common/Types.hpp"
+#include "UnifiedDataPacket.hpp"
+#include "Types.hpp"
 
 namespace mmre {
 namespace engine_core {
@@ -12,8 +12,8 @@ namespace engine_core {
  * @brief Strategy pattern interface for intelligent data downsampling during persistence.
  * 
  * // [架构优化说明] 
- * // 针对 UFS 空间受限问题，不能全量转存。
- * // 不同模态必须有专门的策略，例如：Camera 需要抽帧，Audio 需要特征提取或降采样。
+ * // 针对 UFS 空间受限问题，不能全量转存�?
+ * // 不同模态必须有专门的策略，例如：Camera 需要抽帧，Audio 需要特征提取或降采样�?
  */
 class IDataStoreStrategy {
 public:
