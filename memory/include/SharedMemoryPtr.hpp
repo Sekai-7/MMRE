@@ -31,16 +31,23 @@ public:
     const common::SharedMemoryHandle& GetHandle() const;
 
     /**
-     * @brief Grants read/write access to the actual zero-copy payload in current process space.
-     * Guaranteed to be valid as long as this object is alive.
+     * @brief Const-correctness 修复：防止只读快照被意外修改。
      */
-    void* GetRawData() const { return mappedMemory_.get(); }
+    const void* GetRawData() const { return mappedMemory_.get(); }
+    
+    /**
+     * @brief 获取可变指针（仅限于构建/反序列化阶段使用）。
+     */
+    void* GetRawData() { return mappedMemory_.get(); }
     
     /**
      * @brief Convenience operator to cast data directly to required struct/type.
      */
     template<typename T>
-    T* As() const { return static_cast<T*>(GetRawData()); }
+    const T* As() const { return static_cast<const T*>(GetRawData()); }
+
+    template<typename T>
+    T* As() { return static_cast<T*>(GetRawData()); }
 
     bool IsValid() const { return mappedMemory_ != nullptr; }
 

@@ -19,7 +19,7 @@ public:
     void SetCallback(RequestCallback callback) override;
     void PushEvent(const std::string& topic, 
                    const std::vector<uint8_t>& eventPayload,
-                   const std::vector<memory::SharedMemoryHandle>& shmHandles) override;
+                   const std::vector<common::SharedMemoryHandle>& shmHandles) override;
 
 private:
     std::string socketPath_;

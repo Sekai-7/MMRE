@@ -17,7 +17,8 @@ namespace communication {
 struct IpcResponse {
     common::StatusCode status;
     std::string textualPayload; // Could be JSON metadata, plugin-formatted string, or raw error string
-    std::vector<memory::SharedMemoryHandle> shmHandles; // Zero-copy data handles
+    // 统一命名空间：修复跨域冲突，统一使用 common::SharedMemoryHandle
+    std::vector<common::SharedMemoryHandle> shmHandles; // Zero-copy data handles
 };
 
 /**
@@ -54,7 +55,7 @@ public:
      */
     virtual void PushEvent(const std::string& topic, 
                            const std::vector<uint8_t>& eventPayload,
-                           const std::vector<memory::SharedMemoryHandle>& shmHandles) = 0;
+                           const std::vector<common::SharedMemoryHandle>& shmHandles) = 0;
 };
 
 } // namespace communication
