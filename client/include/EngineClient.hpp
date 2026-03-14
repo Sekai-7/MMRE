@@ -3,8 +3,12 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include <memory>
 #include "Types.hpp"
 #include "SharedMemoryPtr.hpp"
+
+// 引入客户端前置解析器，实现胖客户端架构
+namespace mmre { namespace query { class InterfaceParser; } }
 
 namespace mmre {
 namespace client {
@@ -37,6 +41,8 @@ public:
 
     /**
      * @brief Executes a formatted SQL-like query. (e.g. "SELECT * FROM Camera WHERE time=NOW")
+     * @note SDK 内部在此阶段执行字符串到 Bytecode 的重度 CPU 编译工作，
+     * 仅将编译后的 Bytecode 发送给 Server，彻底消除 IPC 总线与服务端的计算阻塞。
      */
     SqlQueryResult QuerySql(const std::string& sqlQuery);
 
@@ -59,6 +65,8 @@ public:
 
 private:
     std::string connectionUri_;
+    // 客户端持有的查询编译器实例
+    std::shared_ptr<mmre::query::InterfaceParser> sqlCompiler_;
 };
 
 } // namespace client

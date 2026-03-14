@@ -24,7 +24,8 @@ public:
     ~TimelineCache() = default;
 
     /**
-     * @brief Pre-allocate routes for known resources to avoid runtime locking.
+     * @brief Dynamically register routes for multi-modal resources.
+     * Protected by shared_mutex to allow safe hot-plugging of hardware channels.
      */
     void RegisterResourceRoute(uint32_t resourceIdHash, uint32_t subResourceIdHash);
 
@@ -82,7 +83,10 @@ private:
         std::atomic<CacheNode*> listTail{nullptr}; 
     };
 
+    // 读写锁保护路由表，防止运行时动态注册通道引发的 Hash 表扩容崩溃
+    mutable std::shared_mutex routeMapLock_;
     std::unordered_map<uint64_t, std::unique_ptr<CacheSegment>> segmentRoutes_;
+    
     std::shared_ptr<memory::CacheNodePool> nodePool_;
     
     inline uint64_t CalculateRouteKey(uint32_t resHash, uint32_t subHash) const {
