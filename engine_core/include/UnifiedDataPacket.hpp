@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <variant>
-#include <atomic>
 #include "Types.hpp"
 #include "SharedMemoryPtr.hpp"
 
@@ -10,44 +9,40 @@ namespace mmre {
 namespace engine_core {
 
 /**
+ * @brief Generic buffer for inlining small payloads (e.g. primitives, strings) 
+ * without heap allocation, avoiding rigid std::variant types.
+ */
+struct PayloadBuffer {
+    uint8_t data[64]{0};
+    uint32_t size{0};
+};
+
+/**
  * @brief O(1) Copyable data snapshot for fast-path reading.
- * Guarantees zero-copy for large blobs via SharedMemoryPtr ref-counting,
- * whilst keeping primitive signals extremely fast to transmit.
+ * Guarantees zero-copy for large blobs via SharedMemoryPtr ref-counting.
  */
 struct DataSnapshot {
     common::TimestampNs timestamp;
     common::ResourceType type;
     uint32_t pluginSchemaId{0}; // Identifies the plugin to explain/format this data
-    std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;
+    
+    // Extensible Open-Closed polymorphic payload
+    std::variant<PayloadBuffer, memory::SharedMemoryPtr> payload;
 };
 
 /**
- * @brief Intrusive node representation of multi-modal data.
- * ABSOLUTELY NO dynamic allocation allowed inside this struct.
+ * @brief Pure data representation of multi-modal data.
+ * Adheres to SRP by strictly isolating data structure from caching algorithms.
  */
-struct alignas(64) UnifiedDataPacket {
+struct UnifiedDataPacket {
     common::TimestampNs timestamp;
     common::ResourceType type;
     
     uint32_t resourceIdHash;    
     uint32_t subResourceIdHash; 
-    uint32_t pluginSchemaId{0}; // Metadata for explainable text plugin
+    uint32_t pluginSchemaId{0}; 
 
-    // Payload polymorphism
-    std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;
-
-    std::atomic<bool> isPersisted{false};
-    bool isCheckpoint{false};
-
-    // Intrusive Doubly-Linked List (For O(1) tail appends and temporal locality)
-    UnifiedDataPacket* prev{nullptr};
-    UnifiedDataPacket* next{nullptr};
-    
-    // Intrusive Red-Black Tree Pointers (For O(logN) historical lookups)
-    UnifiedDataPacket* parent{nullptr};
-    UnifiedDataPacket* left{nullptr};
-    UnifiedDataPacket* right{nullptr};
-    uint8_t color{0}; // 0: Red, 1: Black
+    std::variant<PayloadBuffer, memory::SharedMemoryPtr> payload;
 };
 
 } // namespace engine_core

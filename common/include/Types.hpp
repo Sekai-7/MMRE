@@ -2,21 +2,25 @@
 
 #include <cstdint>
 #include <string_view>
+#include <cstring>
 
 namespace mmre {
 namespace common {
 
 /**
- * @brief Enum defining all supported multi-modal resource types.
+ * @brief Open-Closed Principle: ResourceType as uint32_t allows dynamic registration
+ * of new modalities without changing core headers.
  */
-enum class ResourceType : uint8_t {
-    VEHICLE_SIGNAL = 0,
-    CAMERA_FRAME = 1,
-    AUDIO_STREAM = 2,
-    SCREEN_CAPTURE = 3,
-    SYSTEM_LOG = 4,
-    UNKNOWN = 255
-};
+using ResourceType = uint32_t;
+
+namespace ResourceTypes {
+    constexpr ResourceType VEHICLE_SIGNAL = 0;
+    constexpr ResourceType CAMERA_FRAME = 1;
+    constexpr ResourceType AUDIO_STREAM = 2;
+    constexpr ResourceType SCREEN_CAPTURE = 3;
+    constexpr ResourceType SYSTEM_LOG = 4;
+    constexpr ResourceType UNKNOWN = 255;
+}
 
 /**
  * @brief Nanosecond-precision timestamp for unified time alignment.
@@ -35,7 +39,7 @@ struct SmallString {
 
     void assign(std::string_view sv) {
         len = static_cast<uint8_t>(sv.length() > MAX_LEN ? MAX_LEN : sv.length());
-        __builtin_memcpy(data, sv.data(), len);
+        std::memcpy(data, sv.data(), len); // Standard cross-platform implementation
     }
 };
 
@@ -55,14 +59,23 @@ enum class StatusCode : uint8_t {
 
 /**
  * @brief Unified return status for operations to replace coarse-grained bool returns.
+ * Fixed: Replaced dangling `const char*` pointer with inline buffer for complete RAII safety.
  */
 struct SystemStatus {
     StatusCode code{StatusCode::SUCCESS};
-    const char* message{nullptr};
+    char message[64]{0};
 
     bool IsSuccess() const { return code == StatusCode::SUCCESS; }
-    static SystemStatus Success() { return {StatusCode::SUCCESS, "Success"}; }
-    static SystemStatus Error(StatusCode c, const char* msg) { return {c, msg}; }
+    static SystemStatus Success() { return {StatusCode::SUCCESS, ""}; }
+    static SystemStatus Error(StatusCode c, const char* msg) { 
+        SystemStatus s;
+        s.code = c;
+        if (msg) {
+            std::strncpy(s.message, msg, sizeof(s.message) - 1);
+            s.message[sizeof(s.message) - 1] = '\0';
+        }
+        return s;
+    }
 };
 
 } // namespace common

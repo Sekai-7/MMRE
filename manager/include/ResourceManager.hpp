@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include "Config.hpp"
 #include "Types.hpp"
 #include "TimelineCache.hpp"
@@ -38,7 +39,7 @@ public:
     common::SystemStatus Run();
 
 private:
-    communication::IpcResponse HandleClientRequest(const std::string& payload);
+    communication::IpcResponse HandleClientRequest(const std::vector<uint8_t>& payload);
 
     common::EngineConfig config_;
 

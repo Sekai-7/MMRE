@@ -5,6 +5,7 @@
 #include <variant>
 #include "Types.hpp"
 #include "SharedMemoryPtr.hpp"
+#include "UnifiedDataPacket.hpp" // Included to access PayloadBuffer definition
 
 namespace mmre {
 namespace ingestion {
@@ -19,7 +20,9 @@ struct RawProviderData {
     uint32_t resourceIdHash;
     uint32_t subResourceIdHash;
     uint32_t pluginSchemaId{0};
-    std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;
+    
+    // Aligns with OCP extensibility buffer
+    std::variant<engine_core::PayloadBuffer, memory::SharedMemoryPtr> payload;
 };
 
 /**
@@ -47,14 +50,15 @@ public:
     virtual void SetPushCallback(OnDataPushedCallback callback) = 0;
 
     /**
-     * @brief Start capturing hardware data.
+     * @brief Start capturing hardware data on a specific fine-grained channel.
+     * Resolves the "coarse control" issue by addressing specific multi-modal streams.
      */
-    virtual void Start() = 0;
+    virtual void StartChannel(uint32_t subResourceIdHash) = 0;
 
     /**
-     * @brief Stop capturing and release hardware resources.
+     * @brief Stop capturing on a specific fine-grained channel.
      */
-    virtual void Stop() = 0;
+    virtual void StopChannel(uint32_t subResourceIdHash) = 0;
 };
 
 } // namespace ingestion

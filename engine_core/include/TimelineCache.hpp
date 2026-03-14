@@ -8,6 +8,7 @@
 #include <memory>
 #include "Types.hpp"
 #include "UnifiedDataPacket.hpp"
+#include "CacheNode.hpp"
 #include "CacheNodePool.hpp"
 
 namespace mmre {
@@ -76,9 +77,9 @@ private:
         SeqLock seqLock;             // Protects listTail for fast-path Tx reads
         std::shared_mutex treeLock;  // Protects RB-Tree for historical lookups & eviction
         
-        UnifiedDataPacket* root{nullptr};
-        UnifiedDataPacket* listHead{nullptr}; 
-        std::atomic<UnifiedDataPacket*> listTail{nullptr}; 
+        CacheNode* root{nullptr};
+        CacheNode* listHead{nullptr}; 
+        std::atomic<CacheNode*> listTail{nullptr}; 
     };
 
     std::unordered_map<uint64_t, std::unique_ptr<CacheSegment>> segmentRoutes_;

@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include "Types.hpp"
 #include "SharedMemoryHandle.hpp"
 
@@ -28,7 +29,9 @@ struct IpcResponse {
  */
 class IServer {
 public:
-    using RequestCallback = std::function<IpcResponse(const std::string& requestPayload)>;
+    // Fixed: Strongly typed binary payload for IPC instead of std::string to avoid 
+    // serialization/deserialization overhead and preserve type safety.
+    using RequestCallback = std::function<IpcResponse(const std::vector<uint8_t>& requestPayload)>;
 
     virtual ~IServer() = default;
 
