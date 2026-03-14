@@ -2,18 +2,31 @@
 
 #include <string>
 #include <functional>
+#include <variant>
 #include "Types.hpp"
-#include "UnifiedDataPacket.hpp"
+#include "SharedMemoryPtr.hpp"
 
 namespace mmre {
 namespace ingestion {
 
 /**
- * @brief Callback invoked by a Resource Provider when new hardware data is generated.
- * Passes DataSnapshot by value/rvalue reference to enforce zero-copy from the very edge
- * without doing dynamic memory allocations for cache nodes here.
+ * @brief Hardware-agnostic representation of ingested data,
+ * preventing dependency inversion from core engine types.
  */
-using OnDataPushedCallback = std::function<void(engine_core::DataSnapshot&&)>;
+struct RawProviderData {
+    common::TimestampNs timestamp;
+    common::ResourceType type;
+    uint32_t resourceIdHash;
+    uint32_t subResourceIdHash;
+    uint32_t pluginSchemaId{0};
+    std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;
+};
+
+/**
+ * @brief Callback invoked by a Resource Provider when new hardware data is generated.
+ * Passes RawProviderData by rvalue reference to enforce zero-copy from the very edge.
+ */
+using OnDataPushedCallback = std::function<void(RawProviderData&&)>;
 
 /**
  * @brief Hardware Abstraction Layer for any multi-modal input source.

@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 #include <memory>
-#include <functional>
+#include <string>
 #include "Types.hpp"
 #include "TimelineCache.hpp"
 
@@ -24,7 +24,8 @@ struct QueryRequest {
 
     // Predicate pushdown: execute complex filtering (e.g. text search, value thresholds) 
     // at the storage/cache level before returning data over IPC.
-    std::function<bool(const engine_core::DataSnapshot&)> filterPredicate{nullptr};
+    // Fixed: Changed from std::function to std::string (AST/Expression) to support IPC serialization.
+    std::string filterExpression{};
 };
 
 /**

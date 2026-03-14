@@ -17,6 +17,7 @@ namespace engine_core {
 struct DataSnapshot {
     common::TimestampNs timestamp;
     common::ResourceType type;
+    uint32_t pluginSchemaId{0}; // Identifies the plugin to explain/format this data
     std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;
 };
 
@@ -30,6 +31,7 @@ struct alignas(64) UnifiedDataPacket {
     
     uint32_t resourceIdHash;    
     uint32_t subResourceIdHash; 
+    uint32_t pluginSchemaId{0}; // Metadata for explainable text plugin
 
     // Payload polymorphism
     std::variant<double, memory::SharedMemoryPtr, common::SmallString> payload;

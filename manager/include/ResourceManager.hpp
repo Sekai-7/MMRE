@@ -38,7 +38,7 @@ public:
     common::SystemStatus Run();
 
 private:
-    std::string HandleClientRequest(const std::string& payload);
+    communication::IpcResponse HandleClientRequest(const std::string& payload);
 
     common::EngineConfig config_;
 

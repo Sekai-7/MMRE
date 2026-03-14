@@ -35,6 +35,7 @@ public:
      */
     common::SystemStatus Insert(common::TimestampNs ts, common::ResourceType type, 
                                 uint32_t resHash, uint32_t subHash, 
+                                uint32_t pluginSchemaId,
                                 decltype(UnifiedDataPacket::payload)&& payload);
 
     /**

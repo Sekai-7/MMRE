@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include "LockFreeRingBuffer.hpp"
 #include "IResourceProvider.hpp"
-#include "UnifiedDataPacket.hpp"
 
 namespace mmre {
 namespace ingestion {
@@ -25,14 +24,14 @@ public:
 
     /**
      * @brief Multi-channel polling method used by IO Reactor to drain all queues.
-     * @return A batched vector of snapshots.
+     * @return A batched vector of raw provider data.
      */
-    std::vector<engine_core::DataSnapshot> PollChannels();
+    std::vector<RawProviderData> PollChannels();
 
 private:
     // 采用每数据源一队列 (Channel per source) 的隔离设计，绝对杜绝 SPSC 遭多线程破坏。
-    // 使用 DataSnapshot 传递以避免 Provider 侧的动态内存分配。
-    using ChannelQueue = LockFreeRingBuffer<engine_core::DataSnapshot, 4096>;
+    // 使用 RawProviderData 传递以避免 Provider 侧对引擎核心数据结构的依赖。
+    using ChannelQueue = LockFreeRingBuffer<RawProviderData, 4096>;
     
     std::unordered_map<uint32_t, std::unique_ptr<ChannelQueue>> channels_;
     std::unordered_map<uint32_t, std::unique_ptr<IResourceProvider>> providers_;

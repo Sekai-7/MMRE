@@ -2,9 +2,22 @@
 
 #include <functional>
 #include <string>
+#include <vector>
+#include "Types.hpp"
+#include "SharedMemoryHandle.hpp"
 
 namespace mmre {
 namespace communication {
+
+/**
+ * @brief Structured response allowing zero-copy transmission of SHM handles
+ * alongside formatting metadata and textual payloads.
+ */
+struct IpcResponse {
+    common::StatusCode status;
+    std::string textualPayload; // Could be JSON metadata, plugin-formatted string, or raw error string
+    std::vector<memory::SharedMemoryHandle> shmHandles; // Zero-copy data handles
+};
 
 /**
  * @brief Abstract base class for communication servers.
@@ -15,7 +28,7 @@ namespace communication {
  */
 class IServer {
 public:
-    using RequestCallback = std::function<std::string(const std::string& requestPayload)>;
+    using RequestCallback = std::function<IpcResponse(const std::string& requestPayload)>;
 
     virtual ~IServer() = default;
 
