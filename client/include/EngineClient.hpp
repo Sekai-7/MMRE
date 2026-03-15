@@ -6,9 +6,7 @@
 #include <memory>
 #include "Types.hpp"
 #include "SharedMemoryPtr.hpp"
-
-// 引入客户端前置解析器，实现胖客户端架构
-namespace mmre { namespace query { class InterfaceParser; } }
+#include "InterfaceParser.hpp"
 
 namespace mmre {
 namespace client {
@@ -65,7 +63,7 @@ public:
 
 private:
     std::string connectionUri_;
-    // 客户端持有的查询编译器实例
+    // 客户端独立拥有解析能力
     std::shared_ptr<mmre::query::InterfaceParser> sqlCompiler_;
 };
 

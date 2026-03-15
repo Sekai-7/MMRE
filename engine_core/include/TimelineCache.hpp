@@ -1,7 +1,6 @@
 #pragma once
 
 #include <shared_mutex>
-#include <unordered_map>
 #include <optional>
 #include <vector>
 #include <atomic>
@@ -9,7 +8,7 @@
 #include "Types.hpp"
 #include "UnifiedDataPacket.hpp"
 #include "CacheNode.hpp"
-#include "CacheNodePool.hpp"
+#include "ConcurrentObjectPool.hpp"
 
 namespace mmre {
 namespace engine_core {
@@ -20,12 +19,12 @@ namespace engine_core {
  */
 class TimelineCache {
 public:
-    TimelineCache(std::shared_ptr<memory::CacheNodePool> pool);
+    TimelineCache(std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> pool);
     ~TimelineCache() = default;
 
     /**
-     * @brief Dynamically register routes for multi-modal resources.
-     * Protected by shared_mutex to allow safe hot-plugging of hardware channels.
+     * @brief 动态注册多模态资源路由。
+     * 写入 Lock-Free Array，彻底消除原设计中 shared_mutex 带来的性能灾难。
      */
     void RegisterResourceRoute(uint32_t resourceIdHash, uint32_t subResourceIdHash);
 
@@ -83,14 +82,14 @@ private:
         std::atomic<CacheNode*> listTail{nullptr}; 
     };
 
-    // 读写锁保护路由表，防止运行时动态注册通道引发的 Hash 表扩容崩溃
-    mutable std::shared_mutex routeMapLock_;
-    std::unordered_map<uint64_t, std::unique_ptr<CacheSegment>> segmentRoutes_;
+    // 【核心性能修复】使用定长无锁指针数组代替 unordered_map + 读写锁
+    static constexpr size_t MAX_ROUTES = 8192;
+    std::atomic<CacheSegment*> segmentRoutes_[MAX_ROUTES]{};
     
-    std::shared_ptr<memory::CacheNodePool> nodePool_;
+    std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> nodePool_;
     
-    inline uint64_t CalculateRouteKey(uint32_t resHash, uint32_t subHash) const {
-        return (static_cast<uint64_t>(resHash) << 32) | subHash;
+    inline size_t CalculateRouteIndex(uint32_t resHash, uint32_t subHash) const {
+        return ((static_cast<uint64_t>(resHash) << 16) ^ subHash) % MAX_ROUTES;
     }
 };
 

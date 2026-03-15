@@ -5,7 +5,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
-#include "Types.hpp"
+#include "QueryTypes.hpp"
 #include "TimelineCache.hpp"
 
 namespace mmre {
@@ -14,28 +14,6 @@ namespace engine_core {
 }
 
 namespace query {
-
-struct QueryRequest {
-    uint32_t resourceIdHash;
-    uint32_t subResourceIdHash;
-    common::TimestampNs startTime;
-    common::TimestampNs endTime; // If equal to startTime, it acts as a point query
-    bool isLatest{false};        // If true, bypasses time and fetches current state
-
-    // Predicate pushdown: execute complex filtering (e.g. text search, value thresholds) 
-    // at the storage/cache level before returning data over IPC.
-    // Fixed: Changed from std::string (AST/Expression) to pre-compiled bytecode (std::vector<uint8_t>) 
-    // to strictly enforce O(1) latency without inline string parsing CPU overhead.
-    std::vector<uint8_t> compiledFilterBytecode{};
-};
-
-/**
- * @brief Metadata returned to Agent upon initializing a successful query.
- */
-struct CursorResponse {
-    uint64_t cursorId{0};          // Globally unique ID across the IPC boundary
-    uint32_t totalEstimatedCount{0}; // Hint for the Agent to pre-allocate buffers
-};
 
 /**
  * @brief Facade mapping requests to Fast Path (RAM) or Slow Path (UFS).
@@ -46,11 +24,9 @@ public:
                 std::shared_ptr<engine_core::PersistenceEngine> persistence);
 
     /**
-     * @brief Orchestrates execution based on data locality.
-     * Fixed: Returns a stateless `cursorId` (CursorResponse) instead of a local polymorphic C++ object.
-     * This establishes a firm IPC boundary, allowing the remote FDBus/UDS Agent to safely stream results.
+     * @brief Orchestrates execution based on pre-compiled requests.
      */
-    std::future<CursorResponse> ExecuteQuery(const QueryRequest& req);
+    std::future<common::CursorResponse> ExecuteQuery(const common::QueryRequest& req);
 
     /**
      * @brief Fetches a batch of data tied to a specific session cursor across the IPC boundary.
