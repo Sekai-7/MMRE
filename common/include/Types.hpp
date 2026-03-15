@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string_view>
 #include <cstring>
+#include <variant>
+#include "SharedMemoryPtr.hpp" // 前置声明或包含以便识别变体类型
 
 namespace mmre {
 namespace common {
@@ -88,6 +90,9 @@ struct SystemStatus {
         return s;
     }
 };
+
+// 【重构】统一全系统的多模态载荷传递类型，彻底消除接口层的强类型耦合
+using PayloadVariant = std::variant<PayloadBuffer, memory::SharedMemoryPtr>;
 
 } // namespace common
 } // namespace mmre

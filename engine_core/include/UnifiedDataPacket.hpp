@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <variant>
 #include "Types.hpp"
-#include "SharedMemoryPtr.hpp"
 
 namespace mmre {
 namespace engine_core {
@@ -15,10 +13,9 @@ namespace engine_core {
 struct DataSnapshot {
     common::TimestampNs timestamp;
     common::ResourceType type;
-    uint32_t pluginSchemaId{0}; // Identifies the plugin to explain/format this data
     
-    // Extensible Open-Closed polymorphic payload
-    std::variant<common::PayloadBuffer, memory::SharedMemoryPtr> payload;
+    // 【重构】使用统一的类型别名，彻底剥离表现层元数据
+    common::PayloadVariant payload;
 };
 
 /**
@@ -31,9 +28,9 @@ struct UnifiedDataPacket {
     
     uint32_t resourceIdHash;    
     uint32_t subResourceIdHash; 
-    uint32_t pluginSchemaId{0}; 
 
-    std::variant<common::PayloadBuffer, memory::SharedMemoryPtr> payload;
+    // 【重构】纯粹的数据载荷变体
+    common::PayloadVariant payload;
 };
 
 } // namespace engine_core

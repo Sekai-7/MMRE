@@ -20,7 +20,9 @@ namespace engine_core {
  */
 class TimelineCache {
 public:
-    TimelineCache(std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> pool);
+    // 【重构】通过构造函数注入并发桶数量，实现软硬件动态伸缩与彻底解耦
+    TimelineCache(std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> pool, 
+                  size_t concurrencyBuckets = 1024);
     ~TimelineCache() = default;
 
     /**
@@ -31,18 +33,16 @@ public:
 
     /**
      * @brief Lock-free tail append for continuous streams. 
-     * Takes payload by rvalue reference to strictly enforce ownership transfer (Zero-Copy).
-     * Returns granular SystemStatus instead of void or bool.
-     * @note Strictly meets the <= 1ms latency constraint.
+     * @note 移除了 pluginSchemaId，使用统一的 PayloadVariant，接口更加严谨。
      */
     common::SystemStatus Insert(common::TimestampNs ts, common::ResourceType type, 
                                 uint32_t resHash, uint32_t subHash, 
-                                uint32_t pluginSchemaId,
-                                decltype(UnifiedDataPacket::payload)&& payload);
+                                common::PayloadVariant&& payload);
 
     /**
-     * @brief O(1) Optimistic fast-path query for the latest snapshot (Tx).
-     * Bypasses all standard mutexes using sequence locks.
+     * @brief Query the latest snapshot (Tx).
+     * 【修正】采用分段共享锁(Shared Read Lock)保护，杜绝 Data Race 与内存踩踏。
+     * 极高并发下的无锁队列交由 Ingestion 层的 RingBuffer 负责，Cache 层侧重绝对的一致性。
      */
     std::optional<DataSnapshot> QueryLatest(uint32_t resHash, uint32_t subHash);
 
@@ -83,8 +83,10 @@ private:
         std::unordered_map<ResourceKey, ResourceTimeline> timelines; 
     };
 
-    static constexpr size_t NUM_BUCKETS = 1024; // 分段锁数量，控制并发冲突度
-    RouteBucket buckets_[NUM_BUCKETS];
+    // 【重构】动态分配的并发桶数组，消除静态硬编码，适应不同规格的车载 SoC
+    size_t numBuckets_;
+    // 使用 vector 管理动态桶，C++17 起 std::vector 原生支持 alignas 类型的高级对齐分配
+    std::vector<RouteBucket> buckets_; 
     
     std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> nodePool_;
     
@@ -93,7 +95,7 @@ private:
         key ^= key >> 33;
         key *= 0xff51afd7ed558ccd;
         key ^= key >> 33;
-        return key % NUM_BUCKETS;
+        return key % numBuckets_; // 动态取模
     }
 };
 
