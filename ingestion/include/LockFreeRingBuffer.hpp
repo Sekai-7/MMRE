@@ -46,8 +46,11 @@ public:
 
 private:
     T buffer_[Capacity];
-    std::atomic<size_t> head_;
-    std::atomic<size_t> tail_;
+    
+    // 【重构：极速性能保障】强制 64 字节 L1 缓存行对齐
+    // 彻底物理隔离读写指针，消除多核高频并发下的伪共享(False Sharing)灾难
+    alignas(64) std::atomic<size_t> head_{0};
+    alignas(64) std::atomic<size_t> tail_{0};
 };
 
 } // namespace ingestion

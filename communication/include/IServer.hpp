@@ -6,19 +6,20 @@
 #include <cstdint>
 #include "Types.hpp"
 #include "SharedMemoryHandle.hpp"
+#include "SharedMemoryPtr.hpp" // 【重构引入】必须感知生命周期
 
 namespace mmre {
 namespace communication {
 
 /**
- * @brief Structured response allowing zero-copy transmission of SHM handles
- * alongside formatting metadata and textual payloads (DTO Pattern).
+ * @brief Structured response strictly enforcing cross-process RAII.
  */
 struct IpcResponse {
     common::StatusCode status;
     std::string textualPayload; // Could be JSON metadata, plugin-formatted string, or raw error string
-    // 统一命名空间：修复跨域冲突，统一使用 common::SharedMemoryHandle
-    std::vector<common::SharedMemoryHandle> shmHandles; // Zero-copy data handles
+    // 【重构：生命周期拦截】必须持有 SharedMemoryPtr，而不是裸句柄 (Handle)。
+    // Server 底层(如 UDS/FDBus 协议栈)将持有此对象，直到收到对端 ACK 才允许析构。
+    std::vector<memory::SharedMemoryPtr> retainedMemory; 
 };
 
 /**
@@ -51,11 +52,11 @@ public:
      * 
      * @param topic Routing topic (e.g. Agent ID, Resource Type, or Event Name)
      * @param eventPayload Binary metadata for the event
-     * @param shmHandles Zero-copy data handles for the event (if any)
+     * @param retainedMemory 生命期强引用的智能指针集合，确保对方读取前不被 UFS 回收
      */
     virtual void PushEvent(const std::string& topic, 
                            const std::vector<uint8_t>& eventPayload,
-                           const std::vector<common::SharedMemoryHandle>& shmHandles) = 0;
+                           const std::vector<memory::SharedMemoryPtr>& retainedMemory) = 0;
 };
 
 } // namespace communication

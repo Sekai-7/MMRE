@@ -5,6 +5,7 @@
 #include <vector>
 #include <atomic>
 #include <memory>
+#include <unordered_map>
 #include "Types.hpp"
 #include "UnifiedDataPacket.hpp"
 #include "CacheNode.hpp"
@@ -14,8 +15,8 @@ namespace mmre {
 namespace engine_core {
 
 /**
- * @brief High-performance, SeqLock-enabled, segmented Timeline Cache.
- * Optimized for O(1) concurrent writes and O(1) Tx snapshot reads.
+ * @brief High-performance Segmented Timeline Cache with Striped Locking.
+ * Ensures 100% exact route matching and memory safety for multi-modal streams.
  */
 class TimelineCache {
 public:
@@ -62,34 +63,37 @@ public:
     void EvictColdData(uint64_t targetFreeBytes);
 
 private:
-    // Memory Barrier Sequence Lock for Lock-free Readers
-    struct alignas(64) SeqLock {
-        std::atomic<uint32_t> sequence{0};
-        void lock_write() { sequence.fetch_add(1, std::memory_order_acquire); }
-        void unlock_write() { sequence.fetch_add(1, std::memory_order_release); }
-        uint32_t read_begin() const { return sequence.load(std::memory_order_acquire); }
-        bool read_retry(uint32_t seq) const { 
-            return (seq & 1) || seq != sequence.load(std::memory_order_acquire); 
-        }
-    };
+    // 【重构：资源精确定位键】组合 ResourceId 与 SubResourceId 确保全局唯一
+    using ResourceKey = uint64_t;
+    static inline ResourceKey MakeKey(uint32_t resHash, uint32_t subHash) {
+        return (static_cast<uint64_t>(resHash) << 32) | subHash;
+    }
 
-    struct CacheSegment {
-        SeqLock seqLock;             // Protects listTail for fast-path Tx reads
-        std::shared_mutex treeLock;  // Protects RB-Tree for historical lookups & eviction
-        
+    // 独立资源的时间线结构（无锁，由外层 Bucket 锁保护）
+    struct ResourceTimeline {
         CacheNode* root{nullptr};
         CacheNode* listHead{nullptr}; 
-        std::atomic<CacheNode*> listTail{nullptr}; 
+        CacheNode* listTail{nullptr}; 
     };
 
-    // 【核心性能修复】使用定长无锁指针数组代替 unordered_map + 读写锁
-    static constexpr size_t MAX_ROUTES = 8192;
-    std::atomic<CacheSegment*> segmentRoutes_[MAX_ROUTES]{};
+    // 【重构：并发分段路由桶】
+    struct alignas(64) RouteBucket {
+        std::shared_mutex rwLock; 
+        // 精确映射，彻底杜绝哈希碰撞导致的多模态数据污染
+        std::unordered_map<ResourceKey, ResourceTimeline> timelines; 
+    };
+
+    static constexpr size_t NUM_BUCKETS = 1024; // 分段锁数量，控制并发冲突度
+    RouteBucket buckets_[NUM_BUCKETS];
     
     std::shared_ptr<memory::ConcurrentObjectPool<CacheNode>> nodePool_;
     
-    inline size_t CalculateRouteIndex(uint32_t resHash, uint32_t subHash) const {
-        return ((static_cast<uint64_t>(resHash) << 16) ^ subHash) % MAX_ROUTES;
+    inline size_t CalculateBucketIndex(ResourceKey key) const {
+        // 扰乱函数打散哈希，路由至对应并发桶
+        key ^= key >> 33;
+        key *= 0xff51afd7ed558ccd;
+        key ^= key >> 33;
+        return key % NUM_BUCKETS;
     }
 };
 

@@ -22,7 +22,7 @@ public:
     void SetCallback(RequestCallback callback) override;
     void PushEvent(const std::string& topic, 
                    const std::vector<uint8_t>& eventPayload,
-                   const std::vector<common::SharedMemoryHandle>& shmHandles) override;
+                   const std::vector<memory::SharedMemoryPtr>& retainedMemory) override;
 
 private:
     std::string serviceName_;
