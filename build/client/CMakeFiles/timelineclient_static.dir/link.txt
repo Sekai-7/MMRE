@@ -1,0 +1,2 @@
+/usr/bin/ar qc libtimelineclient.a  CMakeFiles/timelineclient_obj.dir/timeline_client.cpp.o
+/usr/bin/ranlib libtimelineclient.a

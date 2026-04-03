@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.16)
-
 set(TL_CLIENT_SOURCES
     timeline_client.cpp
 )
 
 add_library(timelineclient_obj OBJECT ${TL_CLIENT_SOURCES})
+
+set_property(TARGET timelineclient_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_library(timelineclient_shared SHARED $<TARGET_OBJECTS:timelineclient_obj>)
 add_library(timelineclient_static STATIC $<TARGET_OBJECTS:timelineclient_obj>)

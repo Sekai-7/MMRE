@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/resource-server.dir/main.cpp.o CMakeFiles/resource-server.dir/server_ipc.cpp.o  -o resource-server  -lpthread 
